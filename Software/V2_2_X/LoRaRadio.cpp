@@ -1,12 +1,16 @@
-#include "LoRaRadio.h"
+#include "LoRaRadio.hpp"
+#include "Constants.hpp"
 
-LoRaRadio::LoRaRadio(const uint32_t *rfswitch_pins, const Module::RfSwitchMode_t *rfswitch_table)
-    : _rfswitch_pins(rfswitch_pins), _rfswitch_table(rfswitch_table) {}
+LoRaRadio::LoRaRadio(const uint32_t *rfswitch_pins, const Module::RfSwitchMode_t *rfswitch_table){
+  radio = new STM32WLx_Module();
+  _rfswitch_pins = rfswitch_pins;
+  _rfswitch_table = rfswitch_table;
+}
 
 bool LoRaRadio::begin(float freq, float power)
 {
   // initialize STM32WL with default settings, except frequency
-  radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+  radio.setRfSwitchTable(_rfswitch_pins, _rfswitch_table);
   int state = radio.begin(freq);
   radio.setOutputPower(power);
 
@@ -26,10 +30,10 @@ bool LoRaRadio::begin(float freq, float power)
   return true;
 }
 
-bool LoRaRadio::setTCX0(float voltage)
+bool LoRaRadio::setTCXO(float voltage)
 {
   // set appropriate TCXO voltage for Nucleo WL55JC1
-  state = radio.setTCXO(voltage);
+  int state = radio.setTCXO(voltage);
   if (state == RADIOLIB_ERR_NONE)
   {
     Print_tx_rx.println(F("success!"));
@@ -45,14 +49,15 @@ bool LoRaRadio::setTCX0(float voltage)
   }
 }
 
-int LoRaRadio::transmit(const String &payload)
+int LoRaRadio::transmit(String payload) //deleted constants and reference
 {
   int state = radio.transmit(payload);
   return state;
 }
 
-void LoRaRadio::interpretState(int state, Stream &debug = Serial)
+void LoRaRadio::interpretState(int state)
 {
+  SoftwareSerial debug = Print_tx_rx; 
   switch (state)
   {
   case RADIOLIB_ERR_NONE:

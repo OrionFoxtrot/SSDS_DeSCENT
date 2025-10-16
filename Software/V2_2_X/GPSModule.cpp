@@ -1,4 +1,5 @@
-#include "GPSModule.h"
+#include "GPSModule.hpp"
+#include "Constants.hpp"
 
 GPSModule::GPSModule(uint8_t rxPin, uint8_t txPin)
     : gpsSerial(rxPin, txPin) // initialize SoftwareSerial with RX/TX pins

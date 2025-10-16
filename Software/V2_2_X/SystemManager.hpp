@@ -1,12 +1,12 @@
 #pragma once
-#include "LoRaRadio.h"
-#include "IMUSensor.h"
-#include "BMESensor.h"
-#include "GPSModule.h"
+#include "LoRaRadio.hpp"
+#include "IMUSensor.hpp"
+#include "BMESensor.hpp"
+#include "GPSModule.hpp"
 #include <SoftwareSerial.h>
 
-class SystemManager
-{
+
+class SystemManager{
 public:
   SystemManager(
       SoftwareSerial &debugSerial,
@@ -34,4 +34,4 @@ private:
 
   String collectData(); // building the packet
   void transmitData(const String &payload);
-}
+};

@@ -1,4 +1,5 @@
-#include "IMUSensor.h"
+#include "IMUSensor.hpp"
+#include "Constants.hpp"
 
 IMUSensor::IMUSensor() {}
 
@@ -7,12 +8,12 @@ bool IMUSensor::begin(uint8_t address)
   Wire.begin();
   if (!imu.begin(0x4A))
   {
-    debug.println("IMU init failed!");
+    Print_tx_rx.print("IMU init failed!");
     return false;
   }
-  myIMU.begin(address);
+  imu.begin(address);
   Wire.setClock(400000);
-  myIMU.enableLinearAccelerometer(50);
+  imu.enableLinearAccelerometer(50);
   return true;
 }
 
@@ -25,10 +26,10 @@ String IMUSensor::readData()
 {
   String str = "";
 
-  x = myIMU.getLinAccelX();
-  y = myIMU.getLinAccelY();
-  z = myIMU.getLinAccelZ();
-  linAccuracy = myIMU.getLinAccelAccuracy();
+  x = imu.getLinAccelX();
+  y = imu.getLinAccelY();
+  z = imu.getLinAccelZ();
+  linAccuracy = imu.getLinAccelAccuracy();
 
   str = str + String(x) + ',' + String(y) + ',' + String(z);
   return (str);

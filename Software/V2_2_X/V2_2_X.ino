@@ -1,9 +1,9 @@
-#include "SystemManager.h"
+#include "SystemManager.hpp"
 #include <SoftwareSerial.h>
 
 #define PRINT_RX PB7
 #define PRINT_TX PB6
-SoftwareSerial PrintSerial(PRINT_RX, PRINT_TX);
+// SoftwareSerial PrintSerial(PRINT_RX, PRINT_TX);
 
 #define GPS_RX PC1
 #define GPS_TX PC0

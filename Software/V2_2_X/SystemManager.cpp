@@ -1,4 +1,5 @@
-#include "SystemManager.h"
+#include "SystemManager.hpp"
+#include "Constants.hpp"
 
 SystemManager::SystemManager(SoftwareSerial &debugSerial,
                              const uint32_t *rfswitch_pins,
@@ -52,10 +53,10 @@ String SystemManager::collectData()
   return data;
 }
 
-void SystemManager::transmitData(const String &payload)
+void SystemManager::transmitData(String payload)
 {
   int state = radio.transmit(payload);
-  radio.interpretState(state, debug); // prints success/error
+  radio.interpretState(state); // prints success/error
 }
 
 void SystemManager::inloop()

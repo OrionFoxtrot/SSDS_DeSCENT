@@ -4,6 +4,7 @@
 #include "SparkFun_BNO080_Arduino_Library.h"
 #include <SoftwareSerial.h>
 
+
 class IMUSensor
 {
 public:

@@ -1,4 +1,5 @@
-#include "BMESensor.h"
+#include "BMESensor.hpp"
+#include "Constants.hpp"
 // #include <Arduino.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -22,7 +23,7 @@ unsigned BMESensor::begin()
       delay(10);
   }
 
-  return status
+  return status;
 }
 
 String BMESensor::readData()
