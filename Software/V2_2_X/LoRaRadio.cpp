@@ -1,16 +1,25 @@
 #include "LoRaRadio.hpp"
 #include "Constants.hpp"
+using namespace std;
+#include <array>
 
-LoRaRadio::LoRaRadio(const uint32_t *rfswitch_pins, const Module::RfSwitchMode_t *rfswitch_table){
-  radio = new STM32WLx_Module();
-  _rfswitch_pins = rfswitch_pins;
-  _rfswitch_table = rfswitch_table;
+
+LoRaRadio::LoRaRadio(std::array<uint32_t, 5> rfswitch_pins, std::array<Module::RfSwitchMode_t, 5> rfswitch_table)
+  : module(new STM32WLx_Module()),
+    radio(module),
+    _rfswitch_pins(rfswitch_pins),
+    _rfswitch_table(rfswitch_table)
+{
+  // Convert std::array to C-style array for setRfSwitchTable
+  uint32_t pins[5];
+  std::copy(_rfswitch_pins.begin(), _rfswitch_pins.end(), pins);
+  radio.setRfSwitchTable(pins, _rfswitch_table.data());
 }
 
 bool LoRaRadio::begin(float freq, float power)
 {
   // initialize STM32WL with default settings, except frequency
-  radio.setRfSwitchTable(_rfswitch_pins, _rfswitch_table);
+  // radio.setRfSwitchTable(_rfswitch_pins, _rfswitch_table);
   int state = radio.begin(freq);
   radio.setOutputPower(power);
 

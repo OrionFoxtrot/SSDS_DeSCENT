@@ -3,6 +3,7 @@
 #include "IMUSensor.hpp"
 #include "BMESensor.hpp"
 #include "GPSModule.hpp"
+#include "Constants.hpp"
 #include <SoftwareSerial.h>
 
 
@@ -10,8 +11,8 @@ class SystemManager{
 public:
   SystemManager(
       SoftwareSerial &debugSerial,
-      const uint32_t *rfswitch_pins,
-      const Module::RfSwitchMode_t *rfswitch_table,
+      std::array<uint32_t, 5> rfswitch_pins,
+      std::array<Module::RfSwitchMode_t, 5> rfswitch_table,
       uint8_t gpsRxPin,
       uint8_t gpsTxPin);
 
@@ -33,5 +34,5 @@ private:
   GPSModule gps;
 
   String collectData(); // building the packet
-  void transmitData(const String &payload);
+  void transmitData(String payload);
 };

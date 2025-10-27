@@ -2,8 +2,8 @@
 #include "Constants.hpp"
 
 SystemManager::SystemManager(SoftwareSerial &debugSerial,
-                             const uint32_t *rfswitch_pins,
-                             const Module::RfSwitchMode_t *rfswitch_table,
+                             std::array<uint32_t, 5> rfswitch_pins,
+                             std::array<Module::RfSwitchMode_t, 5> rfswitch_table,
                              uint8_t gpsRxPin,
                              uint8_t gpsTxPin) : debug(debugSerial),
                                                  radio(rfswitch_pins, rfswitch_table),
@@ -11,6 +11,7 @@ SystemManager::SystemManager(SoftwareSerial &debugSerial,
                                                  bme(),
                                                  gps(gpsRxPin, gpsTxPin)
 {
+
 }
 
 void SystemManager::begin()
