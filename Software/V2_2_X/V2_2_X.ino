@@ -1,3 +1,4 @@
+#pragma once
 #include "SystemManager.hpp"
 #include <SoftwareSerial.h>
 

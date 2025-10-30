@@ -8,7 +8,7 @@ class LoRaRadio
 public:
   LoRaRadio(std::array<uint32_t, 5> rfswitch_pins, std::array<Module::RfSwitchMode_t, 5> rfswitch_table);
   bool begin(float freq, float power = 14.0);
-  bool setTCXO(float voltage);
+  void setTCXO(float voltage);
   int transmit(String payload);
   void interpretState(int state);
 

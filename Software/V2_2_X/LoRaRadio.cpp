@@ -25,11 +25,11 @@ bool LoRaRadio::begin(float freq, float power)
 
   if (state == RADIOLIB_ERR_NONE)
   {
-    Print_tx_rx.println(F("success!"));
+    Print_tx_rx.println(F("success! (begin)"));
   }
   else
   {
-    Print_tx_rx.print(F("failed, code "));
+    Print_tx_rx.print(F("failed (begin), code "));
     Print_tx_rx.println(state);
     while (true)
     {
@@ -39,20 +39,19 @@ bool LoRaRadio::begin(float freq, float power)
   return true;
 }
 
-bool LoRaRadio::setTCXO(float voltage)
+void LoRaRadio::setTCXO(float voltage)
 {
   // set appropriate TCXO voltage for Nucleo WL55JC1
+
   int state = radio.setTCXO(voltage);
-  if (state == RADIOLIB_ERR_NONE)
-  {
-    Print_tx_rx.println(F("success!"));
-  }
-  else
-  {
-    Print_tx_rx.print(F("failed, code "));
+  Print_tx_rx.print(F("state before if: "));
+  Print_tx_rx.println(state);
+  if (state == RADIOLIB_ERR_NONE){
+    Print_tx_rx.println(F("success! (second)"));
+  }else{
+    Print_tx_rx.print(F("failed (second), code "));
     Print_tx_rx.println(state);
-    while (true)
-    {
+    while (true){
       delay(10);
     }
   }

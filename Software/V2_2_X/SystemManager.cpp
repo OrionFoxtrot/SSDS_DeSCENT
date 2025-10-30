@@ -17,7 +17,7 @@ SystemManager::SystemManager(SoftwareSerial &debugSerial,
 void SystemManager::begin()
 {
   debug.begin(9600);
-
+  debug.println("In the process");
   // Initialize sensors
   imu.begin();
   bme.begin();
