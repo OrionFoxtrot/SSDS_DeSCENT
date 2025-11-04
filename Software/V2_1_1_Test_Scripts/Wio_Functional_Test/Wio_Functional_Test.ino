@@ -13,8 +13,8 @@
 #include <SoftwareSerial.h>
 #include <TinyGPSPlus.h>
 
-#define Print_rxPin PB6
-#define Print_txPin PB7
+#define Print_rxPin PB7
+#define Print_txPin PB6
 
 #define GPS_rxPin PC1
 #define GPS_txPin PC0
@@ -96,7 +96,7 @@ void setup() {
 
   // --- START IMU  ---
   Wire.begin();
-  myIMU.begin();
+  myIMU.begin(0x4A);
   Wire.setClock(400000);  //Increase I2C data rate to 400kHz
 
   myIMU.enableLinearAccelerometer(50);  //Send data update every 50ms
@@ -258,7 +258,7 @@ String getIMUInfo() {
   float z = myIMU.getLinAccelZ();
   byte linAccuracy = myIMU.getLinAccelAccuracy();
 
-  str = str + String(int(x)) + ',' + String(int(y)) + ',' + String(int(z));
+  str = str + String(x) + ',' + String(y) + ',' + String(z);
   return (str);
   /*
   Print_tx_rx.print(x, 2);
