@@ -24,7 +24,7 @@ String GPSModule::readData()
 
 String GPSModule::formatInfo()
 {
-    String result = "Location: ";
+    String result = " ";
 
     if (gps.location.isValid())
     {
@@ -35,7 +35,7 @@ String GPSModule::formatInfo()
         result += "INVALID";
     }
 
-    result += "  Date: ";
+    result += ",";
     if (gps.date.isValid())
     {
         result += String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year());
@@ -45,7 +45,7 @@ String GPSModule::formatInfo()
         result += "INVALID";
     }
 
-    result += "  Time: ";
+    result += ",";
     if (gps.time.isValid())
     {
         char buf[16];
