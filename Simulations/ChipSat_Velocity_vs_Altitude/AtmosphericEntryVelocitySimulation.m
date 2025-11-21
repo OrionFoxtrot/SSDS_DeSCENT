@@ -1,0 +1,125 @@
+% 1D vertical drop of a flat plate with altitude-dependent air density
+% Plate starts from altitude h0 and falls straight down.
+% h = altitude above ground [m]
+% v = vertical velocity [m/s], positive down
+
+clear; clc; close all;
+
+% AxB ChipSat
+A_cm = 5;   
+B_cm = 6;      
+
+% Mass
+m = 40; %g
+m = m/1000; %kg
+
+% Aerodynamic / environment parameters
+Cd   = 1.28;        % drag coefficient, flat plate normal to flow (approx)
+g    = 9.81;        % gravity [m/s^2]
+
+% Initial conditions
+h0   = 100000;       % initial altitude [m] (change to any altitude)
+v0   = 0;           % starting from rest, downward positive [m/s]
+
+
+tspan = [0 2000]; 
+A = (A_cm/100) * (B_cm/100);
+
+% PACK PARAMETERS
+params.m    = m;
+params.Cd   = Cd;
+params.A    = A;
+params.g    = g;
+
+% ODE SETUP
+y0 = [h0; v0];  % initial state: [altitude; downward velocity]
+
+% Event to stop integration when we hit the ground (h = 0)
+options = odeset('Events', @(t,y) groundEvent(t,y));
+
+% Integrate
+[t, y] = ode45(@(t,y) flatPlateEOM(t, y, params), tspan, y0, options);
+
+h = y(:,1);   % altitude
+v = y(:,2);   % velocity
+
+% PLOTS
+
+% Velocity vs time
+figure;
+plot(t, v, 'LineWidth', 1.5,'DisplayName','Projected Atmosphere Compensated Velocity');
+% yline(17.617,'r','LineWidth',1,'DisplayName',"Terminal Velocity of Cube ASL")
+% yline(15.956,'g','LineWidth',1,'DisplayName',"Terminal Velocity of Plate ASL")
+grid on;
+xlabel('Time (s)');
+ylabel('Downward velocity v (m/s)');
+title('ChipSat Drop: Velocity vs Time');
+% xlim([0,100000])
+% legend()
+
+
+figure()
+% Velocity vs altitude
+subplot(1,2,1);
+plot(h, v, 'LineWidth', 1.5);
+grid on;
+xlabel('Altitude h (m)');
+ylabel('Downward velocity v (m/s)');
+title('ChipSat Drop: Velocity vs Altitude');
+set(gca, 'XDir', 'reverse'); 
+
+% Altitude vs time
+subplot(1,2,2);
+plot(t, h, 'LineWidth', 1.5);
+grid on;
+xlabel('Time (s)');
+ylabel('Altitude h (m)');
+title('ChipSat Drop: Altitude vs Time');
+set(gca, 'YDir', 'normal');  % altitude increasing upward
+
+function dydt = flatPlateEOM(t, y, params)
+
+    h = y(1); % altitude 
+    v = y(2); % vel
+    m    = params.m;
+    Cd   = params.Cd;
+    A    = params.A;
+    g    = params.g;
+
+    rho = densityAtAlt(h);
+
+   
+
+    % Drag force magnitude
+    D = 0.5 * rho * Cd * A * v^2;   
+
+    % Equations of motion
+    dhdt = -v;           % altitude decreases when velocity is downward
+    dvdt = g - D/m;      % LMB
+    dydt = [dhdt; dvdt];
+end
+
+function [rho] = densityAtAlt(h)
+    
+%https://www.grc.nasa.gov/www/k-12/airplane/atmosmet.html
+    if h<11000
+        T = 15.04 - 0.00649*h;
+        p = 101.29*((T+273.1)/288.08)^5.256;
+    elseif (h>=11000 && h<=25000)
+            T = -56.46;
+            p = 22.65 * exp(1.73-0.000157*h);
+    elseif h>25000
+            T = -131.21+0.00299*h;
+            p = 2.488*((T+273.1)/216.6)^(-11.388);
+    end     
+
+    rho = p/(0.2869* (T+273.1));
+end
+
+function [value, isterminal, direction] = groundEvent(~, y)
+    % Stop integration when altitude h reaches 0 (ground impact)
+    h = y(1);
+    value      = h;    % when value = 0, event triggers
+    isterminal = 1;    % stop the integration
+    direction  = -1;   % only when crossing from positive to negative
+end

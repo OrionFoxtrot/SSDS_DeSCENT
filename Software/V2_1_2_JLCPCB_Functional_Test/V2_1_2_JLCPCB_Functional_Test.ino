@@ -74,6 +74,7 @@ void setup() {
   // initialize STM32WL with default settings, except frequency
   Print_tx_rx.print(F("[STM32WL] Initializing ... "));
   int state = radio.begin(915.0);
+  radio.begin()
   radio.setOutputPower(14);
   if (state == RADIOLIB_ERR_NONE) {
     Print_tx_rx.println(F("success!"));
@@ -96,7 +97,7 @@ void setup() {
 
   // --- START IMU  ---
   Wire.begin();
-  myIMU.begin(0x4A);
+  myIMU.begin(0x4A); // Change me! - Current for the V2.1.2 JLC Made PCB.
   Wire.setClock(400000);  //Increase I2C data rate to 400kHz
 
   myIMU.enableLinearAccelerometer(50);  //Send data update every 50ms
@@ -258,7 +259,7 @@ String getIMUInfo() {
   float z = myIMU.getLinAccelZ();
   byte linAccuracy = myIMU.getLinAccelAccuracy();
 
-  str = str + String(x) + ',' + String(y) + ',' + String(z);
+  str = str + String(int(x)) + ',' + String(int(y)) + ',' + String(int(z));
   return (str);
   /*
   Print_tx_rx.print(x, 2);
