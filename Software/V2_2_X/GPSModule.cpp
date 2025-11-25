@@ -28,7 +28,7 @@ String GPSModule::formatInfo()
 
     if (gps.location.isValid())
     {
-        result += String(gps.location.lat(), 6) + ", " + String(gps.location.lng(), 6);
+        result += String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6);
     }
     else
     {
