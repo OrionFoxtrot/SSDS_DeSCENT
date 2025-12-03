@@ -98,20 +98,12 @@ void pico_set_led(bool led_on) {
 
 // Write string to file in SD card
 FRESULT write_data(char* str){
-  // Mount SD Card
-  printf("Mount SD Card\n");
-  FRESULT fr = f_mount(&fs,"0:",1);
-  if (FR_OK != fr){
-    pico_set_led(false);
-    printf("f_mount error: %s (%d)\n", FRESULT_str(fr),fr);
-    return fr;
-  }
-  
+
   // Open file
   printf("Open File\n");
   FIL fil;
-  const char* const filename = "filename.txt";
-  fr = f_open(&fil, filename, FA_CREATE_ALWAYS | FA_WRITE);
+  const char* const filename = "logdata.txt";
+  FRESULT fr = f_open(&fil, filename, FA_OPEN_ALWAYS | FA_OPEN_APPEND | FA_WRITE);
   if (FR_OK != fr && FR_EXIST != fr){
     printf("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr));
     return fr;
@@ -124,13 +116,13 @@ FRESULT write_data(char* str){
   }
 
   // Close file and unmount
-  printf("Close file and unmount\n");
+  printf("Close file\n");
   fr = f_close(&fil);
   if (FR_OK != fr) {
     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
     return fr;
   }
-  fr = f_unmount("0:");
+  // fr = f_unmount("0:");
 
   return fr;
 }
@@ -170,6 +162,21 @@ int main() {
     }
   }
 
+  // Mount SD Card
+  printf("Mount SD Card\n");
+  FRESULT fr = f_mount(&fs,"0:",1);
+  if (FR_OK != fr){
+    pico_set_led(false);
+    printf("f_mount error: %s (%d)\n", FRESULT_str(fr),fr);
+    return fr;
+  }
+
+  // Write header to SD card
+  printf("Writing header to SD card\n");
+  char header[] = "ChipID,GPSlat,GPSlong,GPSalt,IMUgyroX,IMUgyroY,IMUgyroZ,IMUaccelX,IMUaccelY,IMUaccelZ,IMUmagX,IMUmagY,IMUmagZ,Temp,Humidity,Pressure\n";
+  FRESULT sd_status = write_data(header);
+  printf("SD card status: %s (%d)\n", FRESULT_str(sd_status), sd_status);
+
   // Track received packets
   int packetnum = 0;
 
@@ -192,7 +199,7 @@ int main() {
     printf("done\n");
     packetnum = packetnum + 1;
 
-    // Read packet data and write to SD card
+    // Read packet data
     uint8_t str[bufferlen] = {0};
     int state1 = radio.readData(str,bufferlen);
      if (state1 == RADIOLIB_ERR_NONE) {;
@@ -202,12 +209,13 @@ int main() {
         printf("transmit failed, code %d\n", state1);
     }
 
-    // Format packet as char array
+    // Parse packet data (as CSV), format as char array
     char buf[bufferlen];
     std::snprintf(buf, sizeof(buf), "Packet Num: %d, Contents: %s\n", packetnum, str);
     std::string str_formatted(buf);
+
     // Write to SD card
-    FRESULT sd_status = write_data(buf);
+    sd_status = write_data(buf);
     printf("SD card status: %s (%d)\n", FRESULT_str(sd_status), sd_status);
 
     sleep_ms(1000);
