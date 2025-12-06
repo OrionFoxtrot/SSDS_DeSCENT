@@ -7,14 +7,11 @@
 #include <Adafruit_BME280.h>
 
 #include "SparkFun_BNO080_Arduino_Library.h"  // Click here to get the library: http://librarymanager/All#SparkFun_BNO080
-
-
-
-#include <SoftwareSerial.h>
 #include <TinyGPSPlus.h>
 
 #define Print_rxPin PB7
 #define Print_txPin PB6
+#include <SoftwareSerial.h>
 
 #define GPS_rxPin PC1
 #define GPS_txPin PC0
@@ -41,20 +38,24 @@ static const uint32_t rfswitch_pins[] = { PC_3, PC_4, PC_5, RADIOLIB_NC, RADIOLI
 
 
 static const Module::RfSwitchMode_t rfswitch_table[] = {
-  { STM32WLx::MODE_IDLE, { LOW, LOW, LOW } },
-  { STM32WLx::MODE_RX, { HIGH, HIGH, LOW } },
-  { STM32WLx::MODE_TX_LP, { HIGH, HIGH, HIGH } },
-  { STM32WLx::MODE_TX_HP, { HIGH, LOW, HIGH } },
+  {STM32WLx::MODE_IDLE, {LOW, LOW}},
+  {STM32WLx::MODE_RX, {HIGH, LOW}},
+  {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini (HP)
+  //{STM32WLx::MODE_TX_LP, {HIGH, HIGH}}, // for LoRa-E5-LE mini (LP)
   END_OF_MODE_TABLE,
 };
-/*
-static const Module::RfSwitchMode_t rfswitch_table[] = {
-  {STM32WLx::MODE_IDLE,  {LOW, LOW}},
-  {STM32WLx::MODE_RX,    {HIGH, LOW}},
-  {STM32WLx::MODE_TX_HP, {LOW, HIGH}},
-  END_OF_MODE_TABLE,
-};
-*/
+
+
+// Dont think this works
+// static const Module::RfSwitchMode_t rfswitch_table[] = {
+//   {STM32WLx::MODE_IDLE, {LOW, LOW}},
+//   {STM32WLx::MODE_RX, {HIGH, LOW}},
+//   {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini
+//   END_OF_MODE_TABLE,
+// };
+
+
+
 
 
 void setup() {
@@ -74,8 +75,12 @@ void setup() {
   // initialize STM32WL with default settings, except frequency
   Print_tx_rx.print(F("[STM32WL] Initializing ... "));
   int state = radio.begin(915.0);
-  radio.begin();
-  radio.setOutputPower(14);
+
+
+  radio.setOutputPower(22); //HP
+  //radio.setOutputPower(14); //LP
+
+
   if (state == RADIOLIB_ERR_NONE) {
     Print_tx_rx.println(F("success!"));
   } else {
@@ -117,7 +122,7 @@ void setup() {
     Print_tx_rx.print("   ID of 0x56-0x58 represents a BMP 280,\n");
     Print_tx_rx.print("        ID of 0x60 represents a BME 280.\n");
     Print_tx_rx.print("        ID of 0x61 represents a BME 680.\n");
-    while (1) delay(10);
+    //while (1) delay(10);
   }
   // --- End BME280 ---
 }
@@ -159,10 +164,6 @@ void loop() {
   int state = radio.transmit(transmitString);
 
   radioStateInterpreter(state);
-
-
-
-
 
   // wait for a second before transmitting again
   Print_tx_rx.println("Looping...");

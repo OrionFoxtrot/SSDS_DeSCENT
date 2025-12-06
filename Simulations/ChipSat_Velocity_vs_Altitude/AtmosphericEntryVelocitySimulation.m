@@ -47,6 +47,7 @@ v = y(:,2);   % velocity
 
 % Velocity vs time
 figure;
+% subplot(1,3,1);
 plot(t, v, 'LineWidth', 1.5,'DisplayName','Projected Atmosphere Compensated Velocity');
 % yline(17.617,'r','LineWidth',1,'DisplayName',"Terminal Velocity of Cube ASL")
 % yline(15.956,'g','LineWidth',1,'DisplayName',"Terminal Velocity of Plate ASL")
@@ -54,28 +55,34 @@ grid on;
 xlabel('Time (s)');
 ylabel('Downward velocity v (m/s)');
 title('ChipSat Drop: Velocity vs Time');
+set(gca,'fontsize', 20) 
 % xlim([0,100000])
 % legend()
 
-
-figure()
-% Velocity vs altitude
-subplot(1,2,1);
-plot(h, v, 'LineWidth', 1.5);
-grid on;
-xlabel('Altitude h (m)');
-ylabel('Downward velocity v (m/s)');
-title('ChipSat Drop: Velocity vs Altitude');
-set(gca, 'XDir', 'reverse'); 
-
 % Altitude vs time
-subplot(1,2,2);
-plot(t, h, 'LineWidth', 1.5);
+% subplot(1,3,2);
+figure;
+plot(t, h/1000, 'LineWidth', 1.5);
 grid on;
 xlabel('Time (s)');
-ylabel('Altitude h (m)');
+ylabel('Altitude h (km)');
 title('ChipSat Drop: Altitude vs Time');
-set(gca, 'YDir', 'normal');  % altitude increasing upward
+set(gca, 'YDir', 'normal');  % altitude increasing upward 
+set(gca,'fontsize', 20) 
+
+
+% Velocity vs altitude
+% subplot(1,3,3);
+figure;
+plot(h/1000, v, 'LineWidth', 1.5);
+grid on;
+xlabel('Altitude h (km)');
+ylabel('Downward velocity v (m/s)');
+title('ChipSat Drop: Velocity vs Altitude');
+set(gca,'fontsize', 20) 
+set(gca, 'XDir', 'reverse'); 
+
+
 
 function dydt = flatPlateEOM(t, y, params)
 

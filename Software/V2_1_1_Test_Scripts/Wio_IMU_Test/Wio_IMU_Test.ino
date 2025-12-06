@@ -24,8 +24,8 @@
 
 //#define Print_rxPin PC1
 //#define Print_txPin PC0
-#define Print_rxPin PB6
-#define Print_txPin PB7
+#define Print_rxPin PB7
+#define Print_txPin PB6
 #include <SoftwareSerial.h>
 
 SoftwareSerial Print_tx_rx =  SoftwareSerial(Print_rxPin, Print_txPin);

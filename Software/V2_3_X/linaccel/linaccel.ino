@@ -47,6 +47,7 @@ void setup()
 
   Print_tx_rx.println(F("Linear Accelerometer enabled"));
   Print_tx_rx.println(F("Output in form x, y, z, in m/s^2"));
+  pinMode(PA9, OUTPUT);
 }
 
 void loop()
@@ -54,6 +55,7 @@ void loop()
   //Look for reports from the IMU
   if (myIMU.dataAvailable() == true)
   {
+    digitalWrite(PA9,HIGH);
     float x = myIMU.getLinAccelX();
     float y = myIMU.getLinAccelY();
     float z = myIMU.getLinAccelZ();
@@ -68,5 +70,7 @@ void loop()
     Print_tx_rx.print(linAccuracy);
 
     Print_tx_rx.println();
+    
   }
+  digitalWrite(PA9,LOW);
 }
