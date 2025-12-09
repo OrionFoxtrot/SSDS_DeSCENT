@@ -7,6 +7,7 @@
 #include <Adafruit_BME280.h>
 #include <TinyGPSPlus.h>
 
+// this should work now for new v23x boards
 
 #define Print_rxPin PB7
 #define Print_txPin PB6

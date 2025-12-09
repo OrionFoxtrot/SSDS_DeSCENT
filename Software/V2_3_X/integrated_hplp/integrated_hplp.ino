@@ -18,6 +18,8 @@
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 
+
+
 TinyGPSPlus gps;
 Adafruit_BME280 bme;  // I2C
 BNO080 myIMU;
@@ -37,28 +39,31 @@ STM32WLx radio = new STM32WLx_Module();
 static const uint32_t rfswitch_pins[] = { PC_3, PC_4, PC_5, RADIOLIB_NC, RADIOLIB_NC };
 
 
-static const Module::RfSwitchMode_t rfswitch_table[] = {
+static const Module::RfSwitchMode_t rfswitch_table_LP[] = {
   {STM32WLx::MODE_IDLE, {LOW, LOW}},
   {STM32WLx::MODE_RX, {HIGH, LOW}},
-  {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini (HP)
-  //{STM32WLx::MODE_TX_LP, {HIGH, HIGH}}, // for LoRa-E5-LE mini (LP)
+  // {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini (HP)
+  {STM32WLx::MODE_TX_LP, {HIGH, HIGH}}, // for LoRa-E5-LE mini (LP)
   END_OF_MODE_TABLE,
 };
 
+static const Module::RfSwitchMode_t rfswitch_table_HP[] = {
+  {STM32WLx::MODE_IDLE, {LOW, LOW}},
+  {STM32WLx::MODE_RX, {HIGH, LOW}},
+  {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini (HP)
+  // {STM32WLx::MODE_TX_LP, {HIGH, HIGH}}, // for LoRa-E5-LE mini (LP)
+  END_OF_MODE_TABLE,
+};
 
-// Dont think this works
-// static const Module::RfSwitchMode_t rfswitch_table[] = {
-//   {STM32WLx::MODE_IDLE, {LOW, LOW}},
-//   {STM32WLx::MODE_RX, {HIGH, LOW}},
-//   {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini
-//   END_OF_MODE_TABLE,
-// };
-
-
-
-
+// am i HP?
+bool HP = false;
+// true if hp, false if lp
 
 void setup() {
+  
+  if(HP == false){
+    delay(2700);
+  }
 
   // Serial:
   Print_tx_rx.begin(9600);
@@ -70,7 +75,14 @@ void setup() {
 
   // --- START RF LoRa ---
   // this has to be done prior to calling begin()
-  radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+  if (HP == true){
+    radio.setRfSwitchTable(rfswitch_pins, rfswitch_table_HP);
+    Print_tx_rx.println("Init in HP");
+  }
+  if (HP == false){ // I must be LP
+    radio.setRfSwitchTable(rfswitch_pins, rfswitch_table_LP);
+    Print_tx_rx.println("Init in LP");
+  }
 
   // initialize STM32WL with default settings, except frequency
   Print_tx_rx.print(F("[STM32WL] Initializing ... "));
@@ -78,10 +90,15 @@ void setup() {
   
   // frequency 915, BW 62.5, SF 12
   int state = radio.begin(915.0, 62.5, 12);
+  
 
 
-  radio.setOutputPower(22); //HP
-  //radio.setOutputPower(14); //LP
+  if(HP == true){
+    radio.setOutputPower(22); //HP
+  }
+  if(HP == false){
+    radio.setOutputPower(14); //LP
+  }
 
 
   if (state == RADIOLIB_ERR_NONE) {
@@ -145,13 +162,20 @@ int procChar = 0;
 
 void loop() {
 
-  while (GPS_tx_rx.available() > 0) {
-     gps.encode(GPS_tx_rx.read());
-     if(++procChar >= procMax){
-        break;
-     }
+
+  // while (GPS_tx_rx.available() > 0) {
+  //    gps.encode(GPS_tx_rx.read());
+  //    if(++procChar >= procMax){
+  //       break;
+  //    }
+  // }
+  // displayInfo(&gpsInfo);
+  while (GPS_tx_rx.available() > 0){
+    if (gps.encode(GPS_tx_rx.read())){
+      displayInfo(&gpsInfo);
+  
+    }
   }
-  displayInfo(&gpsInfo);
 
   Print_tx_rx.println("GPS INFO: " + gpsInfo);
 
@@ -164,7 +188,14 @@ void loop() {
   Print_tx_rx.println("BME INFO: " + bMEInfo);
 
 
-  transmitString = gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
+  if (HP == true){
+    transmitString = "HP:"+ gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
+  }
+  if (HP == false){
+    transmitString = "LP:"+ gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
+  }
+  
+  // transmitString = "HP:"+ gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
   Print_tx_rx.println("SIZE OF PACKET: " + String(sizeof(transmitString)));
 
   Print_tx_rx.println("[STM32WL] Transmitting packet: " + transmitString);
@@ -179,83 +210,76 @@ void loop() {
   digitalWrite(PA9, HIGH);  // turn the LED on (HIGH is the voltage level)
   delay(1000);              // wait for a second
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
+  //Print_tx_rx.println("TOA"+radio.getTimeOnAir(12));
   delay(1000);
   count += 1;
 }
 
-void displayInfo(String *str) {
+// void displayInfo(String *str) {
 
-  *str = "";
-  
-  Print_tx_rx.print(F("Location: "));
-  
-  if (gps.location.isValid()) {
-    Print_tx_rx.print(gps.location.lat(), 6);
-    Print_tx_rx.print(F(","));
-    Print_tx_rx.print(gps.location.lng(), 6);
-    *str = *str + "Location: " + gps.location.lat() + ", " + gps.location.lng();
-  } else {
-    Print_tx_rx.print(F("INVALID"));
-    *str = *str + "Location: " + "INVALID";
+String displayInfo(String *info)
+{
+  *info = "Location: ";
+
+  // Location
+  if (gps.location.isValid())
+  {
+    *info += String(gps.location.lat(), 6);
+    *info += ",";
+    *info += String(gps.location.lng(), 6);
+  }
+  else
+  {
+    *info += "INVALID";
   }
 
-  Print_tx_rx.print(F("  Date: "));
-  *str += "  Date: ";
+  *info += "  Date/Time: ";
 
-  if (gps.date.isValid()) {
-    Print_tx_rx.print(gps.date.month());
-    Print_tx_rx.print(F("/"));
-    Print_tx_rx.print(gps.date.day());
-    Print_tx_rx.print(F("/"));
-    Print_tx_rx.print(gps.date.year());
-
-    *str += String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year());
-  } else {
-    Print_tx_rx.print(F("INVALID\n"));
-    *str += "INVALID";
+  // Date
+  if (gps.date.isValid())
+  {
+    *info += String(gps.date.month());
+    *info += "/";
+    *info += String(gps.date.day());
+    *info += "/";
+    *info += String(gps.date.year());
+  }
+  else
+  {
+    *info += "INVALID";
   }
 
-  Print_tx_rx.print(F(" Time: "));
-  *str += " Time: ";
-  if (gps.time.isValid()) {
-    if (gps.time.hour() < 10) {
-      Print_tx_rx.print(F("0"));
-      *str += "0";
-    }
-    Print_tx_rx.print(gps.time.hour());
-    Print_tx_rx.print(F(":"));
-    *str += gps.time.hour() + ":";
-    if (gps.time.minute() < 10) {
-      Print_tx_rx.print(F("0"));
-      *str += "0";
-    }
-    Print_tx_rx.print(gps.time.minute());
-    Print_tx_rx.print(F(":"));
-    *str += gps.time.minute() + ":";
-    if (gps.time.second() < 10) {
-      Print_tx_rx.print(F("0"));
-      *str += "0";
-    }
-    Print_tx_rx.print(gps.time.second());
-    Print_tx_rx.print(F("."));
-    *str += gps.time.second();
-    if (gps.time.centisecond() < 10) {   
-      Print_tx_rx.print(F("0"));
-      *str += "0";
-    }
-    Print_tx_rx.print(gps.time.centisecond());
-    *str += gps.time.centisecond();
-  } else {
-    Print_tx_rx.print(F("INVALID"));
-    *str += "INVALID";
+  *info += " ";
+
+  // Time
+  if (gps.time.isValid())
+  {
+    if (gps.time.hour() < 10) *info += "0";
+    *info += String(gps.time.hour());
+
+    *info += ":";
+
+    if (gps.time.minute() < 10) *info += "0";
+    *info += String(gps.time.minute());
+
+    *info += ":";
+
+    if (gps.time.second() < 10) *info += "0";
+    *info += String(gps.time.second());
+
+    *info += ".";
+
+    if (gps.time.centisecond() < 10) *info += "0";
+    *info += String(gps.time.centisecond());
+  }
+  else
+  {
+    *info += "INVALID";
   }
 
-  Print_tx_rx.print("\n");
-  //Print_tx_rx.println(sizeof(str));
+  return *info;
+
 }
-
-
-
 
 String getIMUInfo() {
   /*
