@@ -3,8 +3,6 @@
 
   Licensed under the MIT License
 
-  Copyright (c) 2024 Cameron Goddard
-
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
@@ -62,14 +60,16 @@ FATFS fs;
 
 // Signal Parameters
 float freq = 915;
-float bw = 125.0;
-int sf = 9;
+float bw = 62.5;
+int sf = 12;
+// int sf = 9;
 int cr = 7;
 int sw = RADIOLIB_SX126X_SYNC_WORD_PRIVATE;
 int pwr = 10; //20 for flight; shouldn't matter on receive end
 int pl = 8;
-int gn = 1;
+int gn = 0;
 int bufferlen = 100;
+int packetlen;
 volatile bool receivedFlag = false;
 
 // LED initialisation
@@ -143,6 +143,7 @@ int main() {
   // Initialize radio with parameters
   printf("[SX1276] Initializing ... ");
   int state = radio.begin(freq,bw,sf,cr,sw,pwr,pl,gn);
+  radio.setSpreadingFactor(sf);
   if (state != RADIOLIB_ERR_NONE) {
     printf("initialization failed, code %d\n", state);
     pico_set_led(false);
@@ -151,6 +152,9 @@ int main() {
       sleep_ms(2000);
     }
   }
+
+
+
   radio.setPacketReceivedAction(setFlag);
   printf("[SX1276] init success!\n");
 
@@ -173,7 +177,8 @@ int main() {
 
   // Write header to SD card
   printf("Writing header to SD card\n");
-  char header[] = "ChipID,GPSlat,GPSlong,GPSalt,IMUgyroX,IMUgyroY,IMUgyroZ,IMUaccelX,IMUaccelY,IMUaccelZ,IMUmagX,IMUmagY,IMUmagZ,Temp,Humidity,Pressure\n";
+  // char header[] = "ChipID,GPSlat,GPSlong,GPSalt,IMUgyroX,IMUgyroY,IMUgyroZ,IMUaccelX,IMUaccelY,IMUaccelZ,IMUmagX,IMUmagY,IMUmagZ,Temp,Humidity,Pressure\n";
+  char header[] = "PacketNum,Contents\n";
   FRESULT sd_status = write_data(header);
   printf("SD card status: %s (%d)\n", FRESULT_str(sd_status), sd_status);
 
@@ -199,19 +204,23 @@ int main() {
     printf("done\n");
     packetnum = packetnum + 1;
 
+    printf("Packet Len: %d\n", radio.getPacketLength());
+    printf("SNR: %d\n", radio.getSNR());
+    printf("RSSI: %d\n", radio.getRSSI());
+
     // Read packet data
     uint8_t str[bufferlen] = {0};
     int state1 = radio.readData(str,bufferlen);
-     if (state1 == RADIOLIB_ERR_NONE) {;
+     if (state1 == RADIOLIB_ERR_NONE) {
         printf("Output: %x\n", str);
         printf("Output: %s\n", str);
     } else {
-        printf("transmit failed, code %d\n", state1);
+        printf("received failed, code %d\n", state1);
     }
 
     // Parse packet data (as CSV), format as char array
     char buf[bufferlen];
-    std::snprintf(buf, sizeof(buf), "Packet Num: %d, Contents: %s\n", packetnum, str);
+    std::snprintf(buf, sizeof(buf), "%d,%s\n", packetnum, str);
     std::string str_formatted(buf);
 
     // Write to SD card
