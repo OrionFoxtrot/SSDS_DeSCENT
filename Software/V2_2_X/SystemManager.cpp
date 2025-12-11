@@ -11,7 +11,6 @@ SystemManager::SystemManager(SoftwareSerial &debugSerial,
                                                  bme(),
                                                  gps(gpsRxPin, gpsTxPin)
 {
-
 }
 
 void SystemManager::begin()
@@ -41,11 +40,11 @@ String SystemManager::collectData()
 
   // GPS
   String gpsData = gps.readData();
-  data += gpsData + ";";
+  data += gpsData + ",";
 
   // IMU
   String imuData = imu.readData();
-  data += imuData + ";";
+  data += imuData + ",";
 
   // BME
   String bmeData = bme.readData();
