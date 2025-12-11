@@ -4,7 +4,6 @@
 #include "SparkFun_BNO080_Arduino_Library.h"
 #include <SoftwareSerial.h>
 
-
 class IMUSensor
 {
 public:
@@ -15,6 +14,7 @@ public:
 
 private:
   BNO080 imu;
-  float x, y, z;
+  float gyroX, gyroY, gyroZ;
+  float linX, linY, linZ;
   byte linAccuracy;
 };

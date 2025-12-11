@@ -51,9 +51,7 @@ String GPSModule::formatInfo()
         char buf[16];
         snprintf(buf, sizeof(buf), "%02d:%02d:%02d%02d",
                  gps.time.hour(),
-                 gps.time.minute(),
-                 gps.time.second(),
-                 gps.time.centisecond());
+                 gps.time.minute());
         result += buf;
     }
     else
