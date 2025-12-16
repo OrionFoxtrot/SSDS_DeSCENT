@@ -26,11 +26,14 @@ String IMUSensor::readData()
 {
   String str = "";
 
-  x = imu.getLinAccelX();
-  y = imu.getLinAccelY();
-  z = imu.getLinAccelZ();
-  linAccuracy = imu.getLinAccelAccuracy();
+  gyroX = imu.getGyroX();
+  gyroY = imu.getGyroY();
+  gyroZ = imu.getGyroZ();
+  linX = imu.getLinAccelX();
+  linY = imu.getLinAccelY();
+  linZ = imu.getLinAccelZ();
+  // linAccuracy = imu.getLinAccelAccuracy();
 
-  str = str + String(x) + ',' + String(y) + ',' + String(z);
+  str = str + String(gyroX) + ',' + String(gyroY) + ',' + String(gyroZ) + ',' + String(linX) + ',' + String(linY) + ',' + String(linZ);
   return (str);
 }

@@ -32,7 +32,7 @@ String BMESensor::readData()
   // match your `getBMEInfo()` order: temp, pressure, altitude, humidity
   str += String(int(bme.readTemperature()));
   str += "," + String(int(bme.readPressure() / 100.0F));
-  str += "," + String(int(bme.readAltitude(SEALEVELPRESSURE_HPA)));
+  // str += "," + String(int(bme.readAltitude(SEALEVELPRESSURE_HPA)));
   str += "," + String(int(bme.readHumidity()));
   return str;
 }
