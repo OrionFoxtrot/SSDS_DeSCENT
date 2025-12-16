@@ -24,21 +24,13 @@ https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing
 
 #include "hw_config.h"
 
-// issues having on same bus as LoRa
-// define pins to be used
+// Define SD Card Pins (see receive.cpp for lora pins)
 #define SPI_PORT spi1
-#define SPI_MISO 12
-#define SPI_MOSI 11
+#define SPI_MISO 12 //DO
+#define SPI_MOSI 11 //DI
 #define SPI_SCK 10
 #define SPI_CS 13
-// #define SPI_PORT spi0
-// #define SPI_MISO 4
-// #define SPI_MOSI 3
-// #define SPI_SCK 2
-// #define SPI_CS 5
-// #define SPI_MISO 0
-// #define SPI_MOSI 7
-// #define SPI_SCK 6
+// Issues having on same bus as LoRa
 
 /* Configuration of hardware SPI object */
 static spi_t spi = {

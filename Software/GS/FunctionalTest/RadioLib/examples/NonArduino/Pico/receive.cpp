@@ -1,78 +1,53 @@
-/*
-  RadioLib Non-Arduino Raspberry Pi Pico library example
-
-  Licensed under the MIT License
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-  SOFTWARE.
-*/
-
+// Default Pico + C libraries
 #include <pico/stdlib.h>
 #include <stdio.h>
 #include <format>
 #include <vector>
 #include <string>
+#include "hardware/clocks.h"
 
+// SD card libraries
 #include "f_util.h"
 #include "ff.h" 
 #include "my_rtc.h"
 #include "hw_config.h"
 
+// LoRa libraries
 #include <RadioLib.h>
 #include "hal/RPiPico/PicoHal.h"
 
-// define pins to be used
+// Define LoRa Module Pins (see hw_config.c for SD card pins)
 #define SPI_PORT spi0
 #define SPI_MISO 4
 #define SPI_MOSI 3
 #define SPI_SCK 2
-// #define SPI_MISO 8
-// #define SPI_MOSI 7
-// #define SPI_SCK 6
-// SD card pins in hw_config.c (uses spi1)
+#define RFM_NSS 26 //CS
 
-#define RFM_NSS 26
 #define RFM_RST 22
-#define RFM_DIO0 14
-#define RFM_DIO1 15
+#define RFM_DIO0 14 //G0
+#define RFM_DIO1 15 //G1
 
-// create a new instance of the HAL class
+// Create a new instance of the HAL class
 PicoHal* hal = new PicoHal(SPI_PORT, SPI_MISO, SPI_MOSI, SPI_SCK);
-// now we can create the radio module
+// Create radio module using hal
 RFM95 radio = new Module(hal, RFM_NSS, RFM_DIO0, RFM_RST, RFM_DIO1);
-// create new SD card object
+// Create new SD card object
 FATFS fs;
 
 // Signal Parameters
-float freq = 915;
-float bw = 62.5;
-int sf = 12;
-// int sf = 9;
-int cr = 7;
+float freq = 915; 
+float bw = 125; // Bandwidth
+int sf = 9; // Spreading factor
+int cr = 7; // Coding rate
 int sw = RADIOLIB_SX126X_SYNC_WORD_PRIVATE;
-int pwr = 10; //20 for flight; shouldn't matter on receive end
-int pl = 8;
-int gn = 0;
-int bufferlen = 100;
+int pwr = 10; // Doesn't matter on receive end
+int pl = 8; // Preamble length
+int gn = 0; // Gain, doesn't matter in receive end
+int bufferlen = 100; // Buffer size needs to be greater than packet size
 int packetlen;
 volatile bool receivedFlag = false;
 
-// LED initialisation
+// LED initialisation, for built in Pico LED
 int pico_led_init(void) {
 #if defined(PICO_DEFAULT_LED_PIN)
     // A device like Pico that uses a GPIO for the LED will define PICO_DEFAULT_LED_PIN
@@ -98,36 +73,36 @@ void pico_set_led(bool led_on) {
 
 // Write string to file in SD card
 FRESULT write_data(char* str){
-
   // Open file
   printf("Open File\n");
   FIL fil;
   const char* const filename = "logdata.txt";
   FRESULT fr = f_open(&fil, filename, FA_OPEN_ALWAYS | FA_OPEN_APPEND | FA_WRITE);
+  // FA_OPEN_ALWAYS - creates file if it doesn't exist
+  // FA_OPEN_APPEND - read/write set to end of file, prevents overwriting existing contents
   if (FR_OK != fr && FR_EXIST != fr){
     printf("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr));
     return fr;
   }
 
-  // Write String
+  // Write string
   printf("Writing string: %s\n",str);
   if (f_printf(&fil, str) < 0) {
         printf("f_printf failed\n");
   }
 
-  // Close file and unmount
+  // Close file
   printf("Close file\n");
   fr = f_close(&fil);
   if (FR_OK != fr) {
     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
     return fr;
   }
-  // fr = f_unmount("0:");
 
   return fr;
 }
 
-// called when packet is received
+// LoRa packet received callback function
 void setFlag(void){
   receivedFlag = true;
 }
@@ -136,25 +111,24 @@ int main() {
   // Initialize pico
   stdio_init_all();
   sleep_ms(100);
+
+  // Initialize LED
   int rc = pico_led_init();
   hard_assert(rc == PICO_OK);
   pico_set_led(true);
   
-  // Initialize radio with parameters
+  // Initialize radio with parameters set above
   printf("[SX1276] Initializing ... ");
   int state = radio.begin(freq,bw,sf,cr,sw,pwr,pl,gn);
-  radio.setSpreadingFactor(sf);
   if (state != RADIOLIB_ERR_NONE) {
     printf("initialization failed, code %d\n", state);
-    pico_set_led(false);
+    pico_set_led(false); 
     while(1){
       printf("initialization failed, code %d\n", state);
       sleep_ms(2000);
     }
   }
-
-
-
+  // Set LoRa receive callback function
   radio.setPacketReceivedAction(setFlag);
   printf("[SX1276] init success!\n");
 
@@ -177,15 +151,15 @@ int main() {
 
   // Write header to SD card
   printf("Writing header to SD card\n");
-  // char header[] = "ChipID,GPSlat,GPSlong,GPSalt,IMUgyroX,IMUgyroY,IMUgyroZ,IMUaccelX,IMUaccelY,IMUaccelZ,IMUmagX,IMUmagY,IMUmagZ,Temp,Humidity,Pressure\n";
-  char header[] = "PacketNum,Contents\n";
+  char header[] = "PLACEHOLDER HEADER\n";
+  // char header[] = "PacketNum,ChipID,GPSlat,GPSlong,GPSalt,IMUgyroX,IMUgyroY,IMUgyroZ,IMUaccelX,IMUaccelY,IMUaccelZ,IMUmagX,IMUmagY,IMUmagZ,Temp,Humidity,Pressure\n";
   FRESULT sd_status = write_data(header);
   printf("SD card status: %s (%d)\n", FRESULT_str(sd_status), sd_status);
 
-  // Track received packets
+  // Count received packets
   int packetnum = 0;
 
-  // loop forever
+  // Loop forever
   for(;;) {
     // Start listening
     receivedFlag = false;
@@ -197,31 +171,36 @@ int main() {
         printf("failed, code %d\n", state);
     }
 
-    // Wait for packet
+    // Wait for packet to arrive
     printf("Waiting for packet ... ");
     while(!receivedFlag){
+      sleep_ms(1);
     }
     printf("done\n");
+    // Count received packets
     packetnum = packetnum + 1;
 
+    // Print packet stats
     printf("Packet Len: %d\n", radio.getPacketLength());
     printf("SNR: %d\n", radio.getSNR());
     printf("RSSI: %d\n", radio.getRSSI());
 
-    // Read packet data
+    // Read packet data into buffer
     uint8_t str[bufferlen] = {0};
     int state1 = radio.readData(str,bufferlen);
-     if (state1 == RADIOLIB_ERR_NONE) {
-        printf("Output: %x\n", str);
-        printf("Output: %s\n", str);
+    str[radio.getPacketLength()] = 0;
+    if (state1 == RADIOLIB_ERR_NONE) {
+      printf("Output: %x\n", str);
+      printf("Output: %s\n", str);
     } else {
-        printf("received failed, code %d\n", state1);
+      printf("received failed, code %d\n", state1);
     }
 
     // Parse packet data (as CSV), format as char array
     char buf[bufferlen];
     std::snprintf(buf, sizeof(buf), "%d,%s\n", packetnum, str);
     std::string str_formatted(buf);
+    // TODO: implement bit parsing, concatenate as comma separated values
 
     // Write to SD card
     sd_status = write_data(buf);
@@ -229,6 +208,4 @@ int main() {
 
     sleep_ms(1000);
   }
-
-  // return(0);
 }
