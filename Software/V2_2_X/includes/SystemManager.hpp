@@ -1,13 +1,14 @@
 #pragma once
-#include "LoRaRadio.hpp"
-#include "IMUSensor.hpp"
-#include "BMESensor.hpp"
-#include "GPSModule.hpp"
+#include "includes/communication/LoRaRadio.hpp"
+#include "includes/sensors/IMUSensor.hpp"
+#include "includes/sensors/BMESensor.hpp"
+#include "includes/sensors/GPSModule.hpp"
+#include "includes/communication/DataPacket.hpp"
 #include "Constants.hpp"
 #include <SoftwareSerial.h>
 
-
-class SystemManager{
+class SystemManager
+{
 public:
   SystemManager(
       SoftwareSerial &debugSerial,
@@ -33,6 +34,7 @@ private:
   BMESensor bme;
   GPSModule gps;
 
-  String collectData(); // building the packet
-  void transmitData(String payload);
+  DataPacket collectData(); // building the packet
+  void transmitData(const DataPacket &payload);
+  void printPacket(DataPacket &data);
 };
