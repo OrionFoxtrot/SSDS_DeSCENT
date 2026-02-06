@@ -1,5 +1,5 @@
-#include "BMESensor.hpp"
-#include "Constants.hpp"
+#include "includes/sensors/BMESensor.hpp"
+#include "includes/Constants.hpp"
 // #include <Arduino.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -26,13 +26,13 @@ unsigned BMESensor::begin()
   return status;
 }
 
-String BMESensor::readData()
+BMEData BMESensor::readData()
 {
-  String str = "";
-  // match your `getBMEInfo()` order: temp, pressure, altitude, humidity
-  str += String(int(bme.readTemperature()));
-  str += "," + String(int(bme.readPressure() / 100.0F));
-  // str += "," + String(int(bme.readAltitude(SEALEVELPRESSURE_HPA)));
-  str += "," + String(int(bme.readHumidity()));
-  return str;
+  BMEData data;
+
+  data.temp = int16_t(bme.readTemperature());
+  data.pressure = int16_t(bme.readPressure() / 100.0F);
+  data.humidity = int16_t(bme.readHumidity());
+
+  return data;
 }

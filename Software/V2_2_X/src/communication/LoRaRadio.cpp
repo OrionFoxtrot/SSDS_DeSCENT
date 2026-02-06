@@ -1,14 +1,13 @@
-#include "LoRaRadio.hpp"
-#include "Constants.hpp"
+#include "includes/communication/LoRaRadio.hpp"
+#include "includes/Constants.hpp"
 using namespace std;
 #include <array>
 
-
 LoRaRadio::LoRaRadio(std::array<uint32_t, 5> rfswitch_pins, std::array<Module::RfSwitchMode_t, 5> rfswitch_table)
-  : module(new STM32WLx_Module()),
-    radio(module),
-    _rfswitch_pins(rfswitch_pins),
-    _rfswitch_table(rfswitch_table)
+    : module(new STM32WLx_Module()),
+      radio(module),
+      _rfswitch_pins(rfswitch_pins),
+      _rfswitch_table(rfswitch_table)
 {
   // Convert std::array to C-style array for setRfSwitchTable
   uint32_t pins[5];
@@ -46,26 +45,30 @@ void LoRaRadio::setTCXO(float voltage)
   int state = radio.setTCXO(voltage);
   Print_tx_rx.print(F("state before if: "));
   Print_tx_rx.println(state);
-  if (state == RADIOLIB_ERR_NONE){
+  if (state == RADIOLIB_ERR_NONE)
+  {
     Print_tx_rx.println(F("success! (second)"));
-  }else{
+  }
+  else
+  {
     Print_tx_rx.print(F("failed (second), code "));
     Print_tx_rx.println(state);
-    while (true){
+    while (true)
+    {
       delay(10);
     }
   }
 }
 
-int LoRaRadio::transmit(String payload) //deleted constants and reference
+int LoRaRadio::transmit(uint8_t *payload, size_t length) // deleted constants and reference
 {
-  int state = radio.transmit(payload);
+  int state = radio.transmit(payload, length);
   return state;
 }
 
 void LoRaRadio::interpretState(int state)
 {
-  SoftwareSerial debug = Print_tx_rx; 
+  SoftwareSerial debug = Print_tx_rx;
   switch (state)
   {
   case RADIOLIB_ERR_NONE:
