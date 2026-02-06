@@ -11,9 +11,13 @@ bool IMUSensor::begin(uint8_t address)
     Print_tx_rx.print("IMU init failed!");
     return false;
   }
-  imu.begin(address);
+  // imu.begin(address);
   Wire.setClock(400000);
-  imu.enableLinearAccelerometer(50);
+
+  imu.enableLinearAccelerometer(10);
+  imu.enableGyro(20); // 10ms = 100Hz
+  imu.enableMagnetometer(100);
+
   return true;
 }
 
@@ -26,27 +30,42 @@ IMUData IMUSensor::readData()
 {
   IMUData data;
 
-  float gyroX, gyroY, gyroZ;
-  float linX, linY, linZ;
-  float magX, magY, magZ;
-  uint8_t gyroAccuracy, accelAccuracy, magAccuracy;
+  if (imu.dataAvailable())
+  {
+    Print_tx_rx.printf("data available");
+    float gyroX, gyroY, gyroZ;
+    float linX, linY, linZ;
+    float magX, magY, magZ;
+    uint8_t gyroAccuracy, accelAccuracy, magAccuracy;
 
-  imu.getGyro(gyroX, gyroY, gyroZ, gyroAccuracy);
-  imu.getLinAccel(linX, linY, linZ, accelAccuracy);
-  imu.getMag(magX, magY, magZ, magAccuracy);
+    imu.getGyro(gyroX, gyroY, gyroZ, gyroAccuracy);
+    imu.getLinAccel(linX, linY, linZ, accelAccuracy);
+    imu.getMag(magX, magY, magZ, magAccuracy);
 
-  // Convert to int16_t (scale as needed) - TODO: change
-  data.gyroX = int16_t(gyroX * 100);
-  data.gyroY = int16_t(gyroY * 100);
-  data.gyroZ = int16_t(gyroZ * 100);
+    // DEBUG PRINT: See raw floats before they get converted to int16_t
+    // Using Print_tx_rx or Serial
+    Print_tx_rx.printf("RAW_IMU: %.2f, %.2f, %.2f\n", linX, linY, linZ);
 
-  data.linX = int16_t(linX * 100);
-  data.linY = int16_t(linY * 100);
-  data.linZ = int16_t(linZ * 100);
+    // Helper lambda to scale and clamp safely
+    auto packFloat = [](float value, float scale) -> int16_t
+    {
+      float scaled = value * scale;
+      // Clamp to prevent integer overflow/wrap-around
+      return (int16_t)std::clamp(lroundf(scaled), -32768L, 32767L);
+    };
 
-  data.magX = int16_t(magX * 100);
-  data.magY = int16_t(magY * 100);
-  data.magZ = int16_t(magZ * 100);
+    // Convert to int16_t (scale as needed) - TODO: change
+    data.gyroX = packFloat(gyroX, 100.0f);
+    data.gyroY = packFloat(gyroY, 100.0f);
+    data.gyroZ = packFloat(gyroZ, 100.0f);
 
+    data.linX = packFloat(linX, 100.0f);
+    data.linY = packFloat(linY, 100.0f);
+    data.linZ = packFloat(linZ, 100.0f);
+
+    data.magX = packFloat(magX, 100.0f);
+    data.magY = packFloat(magY, 100.0f);
+    data.magZ = packFloat(magZ, 100.0f);
+  }
   return data;
 }

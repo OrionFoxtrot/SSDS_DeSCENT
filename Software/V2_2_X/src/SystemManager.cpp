@@ -37,31 +37,36 @@ void SystemManager::begin()
 void SystemManager::printPacket(DataPacket &data)
 {
   debug.println("=== Sensor Data ===");
-  debug.println("GPS: %ld, %ld, %ld @ %d\n",
-                data.gpsData.latitude, data.gpsData.longitude,
-                data.gpsData.altitude, data.gpsData.time);
+  debug.printf("GPS: %ld, %ld, %ld @ %u\n",
+               data.gpsData.latitude, data.gpsData.longitude,
+               data.gpsData.altitude, data.gpsData.time);
 
-  debug.println("Gyro: %d, %d, %d\n",
-                data.imuData.gyroX, data.imuData.gyroY, data.imuData.gyroZ);
+  debug.printf("Gyro: %d, %d, %d\n",
+               data.imuData.gyroX, data.imuData.gyroY, data.imuData.gyroZ);
 
-  debug.println("LinAcc: %d, %d, %d\n",
-                data.imuData.linX, data.imuData.linY, data.imuData.linZ);
+  debug.printf("LinAcc: %d, %d, %d\n",
+               data.imuData.linX, data.imuData.linY, data.imuData.linZ);
 
-  debug.println("Mag: %d, %d, %d\n",
-                data.imuData.magX, data.imuData.magY, data.imuData.magZ);
+  debug.printf("Mag: %d, %d, %d\n",
+               data.imuData.magX, data.imuData.magY, data.imuData.magZ);
 
-  debug.println("BME: T=%d P=%d H=%d\n",
-                data.bmeData.temp, data.bmeData.pressure, data.bmeData.humidity);
+  debug.printf("BME: T=%d P=%d H=%d\n",
+               data.bmeData.temp, data.bmeData.pressure, data.bmeData.humidity);
 
   // 2. Raw Hex Dump (The "Is it actually packed?" test)
   uint8_t *raw = (uint8_t *)&data;
-  debug.print("Raw Bytes: ");
+  debug.print("Raw Bytes (Size: ");
+  debug.print(sizeof(DataPacket));
+  debug.print("): ");
+
   for (size_t i = 0; i < sizeof(DataPacket); i++)
   {
+    if (raw[i] < 0x10)
+      debug.print("0");
     debug.print(raw[i], HEX);
     debug.print(" ");
   }
-  debug.println();
+  debug.println("\n==================");
 }
 
 DataPacket SystemManager::collectData()
@@ -89,7 +94,7 @@ void SystemManager::inloop()
   debug.println("Transmitting payload:");
   // debug.println(payload); TODO: finish serial debugger print
 
-  transmitData(payload);
+  // transmitData(payload);
 
   // optional (for testing?)
   digitalWrite(PA9, HIGH);
