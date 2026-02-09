@@ -14,9 +14,9 @@ bool IMUSensor::begin(uint8_t address)
   // imu.begin(address);
   Wire.setClock(400000);
 
-  imu.enableLinearAccelerometer(10);
-  imu.enableGyro(20); // 10ms = 100Hz
-  imu.enableMagnetometer(100);
+  imu.enableLinearAccelerometer(50);
+  imu.enableGyro(10);          // 10ms = 100Hz
+  imu.enableMagnetometer(100); // TODO: check if these are right later, maybe 20?
 
   return true;
 }
