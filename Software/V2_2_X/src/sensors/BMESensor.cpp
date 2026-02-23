@@ -1,5 +1,4 @@
 #include "includes/sensors/BMESensor.hpp"
-#include "includes/Constants.hpp"
 // #include <Arduino.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)

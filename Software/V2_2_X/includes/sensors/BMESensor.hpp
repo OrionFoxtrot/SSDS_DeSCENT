@@ -3,6 +3,7 @@
 #include <Adafruit_BME280.h>
 #include <SoftwareSerial.h>
 #include "includes/communication/DataPacket.hpp"
+#include "includes/Constants.hpp"
 
 class BMESensor
 {

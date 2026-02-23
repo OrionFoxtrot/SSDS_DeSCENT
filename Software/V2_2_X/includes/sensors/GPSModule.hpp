@@ -3,6 +3,7 @@
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
 #include "includes/communication/DataPacket.hpp"
+#include "includes/Constants.hpp"
 
 class GPSModule
 {

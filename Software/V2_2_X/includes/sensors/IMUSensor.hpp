@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include "SparkFun_BNO080_Arduino_Library.h"
 #include <SoftwareSerial.h>
+#include "includes/Constants.hpp"
 #include "includes/communication/DataPacket.hpp"
 
 class IMUSensor
