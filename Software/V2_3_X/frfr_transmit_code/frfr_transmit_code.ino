@@ -84,9 +84,11 @@ void setup() {
   // initialize STM32WL with default settings, except frequency
   Print_tx_rx.print(F("[STM32WL] Initializing ... "));
   // int state = radio.begin(915.0);
+
+
   
   // frequency 915, BW 62.5, SF 12
-  // LP SF 11
+  // LP SF 11, HP SF 12
   int state = radio.begin(915.0, 62.5, 11);
 
   // HP LP CHANGE ME START
@@ -172,12 +174,14 @@ void loop() {
   
     }
   }
+  delay(1000);              // wait for a second
 
   Print_tx_rx.println("GPS INFO: " + gpsInfo);
 
   if (myIMU.dataAvailable() == true) {
     iMUInfo = getIMUInfo();
   }
+
   Print_tx_rx.println("IMU INFO: " + iMUInfo);
 
   bMEInfo = getBMEInfo();
@@ -189,6 +193,7 @@ void loop() {
 
   transmitString = "LP:"+ gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
   // transmitString = "HP:"+ gpsInfo + ';' + iMUInfo + ';' + bMEInfo;
+  // transmitString = "Hi Gr";
 
   // HP LP CHANGE ME END
 
@@ -204,7 +209,7 @@ void loop() {
   Print_tx_rx.println("Looping...");
 
   
-  delay(1000);              // wait for a second
+  // old delay location
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
   //delay(1000);
   count += 1;
