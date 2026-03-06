@@ -60,35 +60,73 @@ void LoRaRadio::setTCXO(float voltage)
   }
 }
 
-int LoRaRadio::transmit(uint8_t *payload, size_t length) // deleted constants and reference
+// int LoRaRadio::transmit(uint8_t *payload, size_t length) // deleted constants and reference
+// {
+//   int state = radio.transmit(payload, length);
+//   return state;
+// }
+volatile bool txDone = false;
+
+void onTxDone()
 {
-  int state = radio.transmit(payload, length);
+  txDone = true;
+}
+
+int LoRaRadio::transmit(uint8_t *payload, size_t length)
+{
+  // Start non-blocking transmission
+  int state = radio.startTransmit(payload, length);
+  if (state != RADIOLIB_ERR_NONE)
+  {
+    return state;
+  }
+
+  // Attach DIO1 interrupt
+  radio.setDio1Action(onTxDone);
+
+  // Wait for completion or timeout
+  unsigned long start = millis();
+  while (!txDone && (millis() - start < 5000))
+  {
+    delay(1);
+  }
+
+  if (!txDone)
+  {
+    state = RADIOLIB_ERR_TX_TIMEOUT;
+  }
+
+  txDone = false; // Reset flag
   return state;
 }
 
 void LoRaRadio::interpretState(int state)
 {
-  SoftwareSerial debug = Print_tx_rx;
+  // SoftwareSerial &debug = Print_tx_rx;
+  delay(5);
   switch (state)
   {
   case RADIOLIB_ERR_NONE:
-    debug.println(F("[LoRaRadio] Packet transmitted successfully!"));
-    debug.print(F("[LoRaRadio] Data rate: "));
-    debug.print(radio.getDataRate());
-    debug.println(F(" bps"));
+    Print_tx_rx.println(F("[LoRaRadio] Packet transmitted successfully!"));
+    Print_tx_rx.print(F("[LoRaRadio] Data rate: "));
+    Print_tx_rx.print(radio.getDataRate());
+    Print_tx_rx.println(F(" bps"));
     break;
 
   case RADIOLIB_ERR_PACKET_TOO_LONG:
-    debug.println(F("[LoRaRadio] Packet too long!"));
+    Print_tx_rx.println(F("[LoRaRadio] Packet too long!"));
     break;
 
   case RADIOLIB_ERR_TX_TIMEOUT:
-    debug.println(F("[LoRaRadio] Transmission timeout!"));
+    Print_tx_rx.println(F("[LoRaRadio] Transmission timeout!"));
     break;
 
   default:
-    debug.print(F("[LoRaRadio] Transmission failed, code: "));
-    debug.println(state);
+    Print_tx_rx.print(F("[LoRaRadio] Transmission failed, code: "));
+    Print_tx_rx.println(state);
     break;
   }
+
+  // Print_tx_rx.flush();
+  // delay(5);
 }

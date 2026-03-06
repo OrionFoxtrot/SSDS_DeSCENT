@@ -20,23 +20,48 @@ bool IMUSensor::begin(uint8_t address)
   return true;
 }
 
-bool IMUSensor::available()
-{
-  return imu.dataAvailable();
-}
+// bool IMUSensor::available()
+// {
+//   return imu.dataAvailable();
+// }
 
+static int consecutiveFailures = 0;
 IMUData IMUSensor::readData()
 {
+  if (consecutiveFailures >= 5)
+  {
+    Print_tx_rx.println(F("!!! IMU STALL/RESET - RE-INITIALIZING HARDWARE !!!"));
+
+    // Actually re-run the begin sequence
+    if (imu.begin(0x4A))
+    {
+      // TODO: just call begin() instead?
+      imu.enableLinearAccelerometer(50);
+      imu.enableGyro(50);
+      imu.enableMagnetometer(50);
+      consecutiveFailures = 0;
+    }
+    else
+    {
+      Print_tx_rx.println(F("IMU Re-init Failed. Bus still busy?"));
+    }
+  }
+
   IMUData data = {0};
   Print_tx_rx.print("Checking IMU... ");
 
+  unsigned long timeout = millis() + 100; // 100ms timeout
+  while (!imu.dataAvailable())
+  {
+    if (millis() > timeout)
+      break; // don't hang forever
+  }
+
   if (imu.dataAvailable())
   {
+    consecutiveFailures = 0;
     Print_tx_rx.println("DATA FOUND!");
-    // float gyroX = 0.0f, gyroY = 0.0f, gyroZ = 0.0f;
-    // float linX = 0.0f, linY = 0.0f, linZ = 0.0f;
-    // float magX = 0.0f, magY = 0.0f, magZ = 0.0f;
-    // byte gyroAccuracy = 0, accelAccuracy = 0, magAccuracy = 0;
+
     float gyroX, gyroY, gyroZ;
     float linX, linY, linZ;
     float magX, magY, magZ;
@@ -93,8 +118,12 @@ IMUData IMUSensor::readData()
   }
   else
   {
-    Print_tx_rx.println("DATA FOUND!");
+    consecutiveFailures++; // Increment failure count
+    Print_tx_rx.print(F("NO DATA - skipping! (Fail count: "));
+    Print_tx_rx.print(consecutiveFailures);
+    Print_tx_rx.println(F(")"));
   }
+  Print_tx_rx.println();
 
   return data;
 }

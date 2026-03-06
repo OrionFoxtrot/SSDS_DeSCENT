@@ -7,3 +7,5 @@
 
 extern SoftwareSerial Print_tx_rx;
 extern SoftwareSerial GPS_tx_rx;
+
+// inline constexpr size_t PACKET_SIZE;
