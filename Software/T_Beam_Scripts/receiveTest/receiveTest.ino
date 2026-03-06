@@ -7,9 +7,21 @@
 #include "boards.h"
 
  // conservative option
+
+// Standard Options:
+// float freq = 915;
+// float bw = 125.0;
+// int sf = 9;
+// int cr = 7;
+// int sw = RADIOLIB_SX126X_SYNC_WORD_PRIVATE;
+// int pwr = 20;
+// int pl = 8;
+// int gn = 1;
+
+// Josh Recomended:
 float freq = 915;
-float bw = 125.0;
-int sf = 9;
+float bw = 62.5;
+int sf = 12;
 int cr = 7;
 int sw = RADIOLIB_SX126X_SYNC_WORD_PRIVATE;
 int pwr = 20;
@@ -174,7 +186,7 @@ void loop()
             Serial.println("BME Data: "+bMEData);
 
             Serial.print("RSSI: "); Serial.print(radio.getRSSI()); Serial.println(F(" dBm")); 
-            //Serial.print("SNR: "); Serial.print(radio.getSNR()); Serial.println(F(" dB"));
+            Serial.print("SNR: "); Serial.print(radio.getSNR()); Serial.println(F(" dB"));
 
 
     

@@ -44,6 +44,7 @@ h = y(:,1);   % altitude
 v = y(:,2);   % velocity
 
 % PLOTS
+title = 0;
 
 % Velocity vs time
 figure;
@@ -53,8 +54,10 @@ plot(t, v, 'LineWidth', 1.5,'DisplayName','Projected Atmosphere Compensated Velo
 % yline(15.956,'g','LineWidth',1,'DisplayName',"Terminal Velocity of Plate ASL")
 grid on;
 xlabel('Time (s)');
-ylabel('Downward velocity v (m/s)');
+ylabel('Downward velocity (m/s)');
+if title == 1
 title('ChipSat Drop: Velocity vs Time');
+end
 set(gca,'fontsize', 20) 
 % xlim([0,100000])
 % legend()
@@ -62,11 +65,13 @@ set(gca,'fontsize', 20)
 % Altitude vs time
 % subplot(1,3,2);
 figure;
-plot(t, h/1000, 'LineWidth', 1.5);
+plot(t/60, h/1000, 'LineWidth', 1.5);
 grid on;
-xlabel('Time (s)');
-ylabel('Altitude h (km)');
+xlabel('Time (Min)');
+ylabel('Altitude (km)');
+if(title == 1)
 title('ChipSat Drop: Altitude vs Time');
+end
 set(gca, 'YDir', 'normal');  % altitude increasing upward 
 set(gca,'fontsize', 20) 
 
@@ -76,9 +81,11 @@ set(gca,'fontsize', 20)
 figure;
 plot(h/1000, v, 'LineWidth', 1.5);
 grid on;
-xlabel('Altitude h (km)');
-ylabel('Downward velocity v (m/s)');
+xlabel('Altitude (km)');
+ylabel('Downward velocity (m/s)');
+if title==1
 title('ChipSat Drop: Velocity vs Altitude');
+end
 set(gca,'fontsize', 20) 
 set(gca, 'XDir', 'reverse'); 
 
