@@ -75,16 +75,38 @@ void onTxDone()
 int LoRaRadio::transmit(uint8_t *payload, size_t length)
 {
   // Start non-blocking transmission
+  // int state = radio.startTransmit(payload, length);
+  // if (state != RADIOLIB_ERR_NONE)
+  // {
+  //   return state;
+  // }
+
+  // // Attach DIO1 interrupt
+  // radio.setDio1Action(onTxDone);
+
+  // // Wait for completion or timeout
+  // unsigned long start = millis();
+  // while (!txDone && (millis() - start < 5000))
+  // {
+  //   delay(1);
+  // }
+
+  // if (!txDone)
+  // {
+  //   state = RADIOLIB_ERR_TX_TIMEOUT;
+  // }
+
+  // txDone = false; // Reset flag
+  // return state;
+  txDone = false;                // reset flag FIRST
+  radio.setDio1Action(onTxDone); // attach BEFORE transmit
+
   int state = radio.startTransmit(payload, length);
   if (state != RADIOLIB_ERR_NONE)
   {
     return state;
   }
 
-  // Attach DIO1 interrupt
-  radio.setDio1Action(onTxDone);
-
-  // Wait for completion or timeout
   unsigned long start = millis();
   while (!txDone && (millis() - start < 5000))
   {
@@ -96,7 +118,7 @@ int LoRaRadio::transmit(uint8_t *payload, size_t length)
     state = RADIOLIB_ERR_TX_TIMEOUT;
   }
 
-  txDone = false; // Reset flag
+  txDone = false;
   return state;
 }
 

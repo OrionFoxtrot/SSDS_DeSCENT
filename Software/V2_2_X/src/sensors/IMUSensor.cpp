@@ -5,13 +5,15 @@ IMUSensor::IMUSensor() {}
 bool IMUSensor::begin(uint8_t address)
 {
   Wire.begin();
+  Wire.setClock(400000);
+  delay(500);
+
   if (!imu.begin(0x4A))
   {
     Print_tx_rx.print("IMU init failed!");
     return false;
   }
   // imu.begin(address);
-  Wire.setClock(400000);
 
   imu.enableLinearAccelerometer(50);
   imu.enableGyro(50); // 10ms = 100Hz
@@ -25,7 +27,6 @@ bool IMUSensor::begin(uint8_t address)
 //   return imu.dataAvailable();
 // }
 
-static int consecutiveFailures = 0;
 IMUData IMUSensor::readData()
 {
   if (consecutiveFailures >= 5)
@@ -62,6 +63,7 @@ IMUData IMUSensor::readData()
     consecutiveFailures = 0;
     Print_tx_rx.println("DATA FOUND!");
 
+    // TODO: make these member variables?
     float gyroX, gyroY, gyroZ;
     float linX, linY, linZ;
     float magX, magY, magZ;
@@ -104,13 +106,13 @@ IMUData IMUSensor::readData()
     };
 
     // Convert to int16_t (scale as needed) - TODO: change
-    data.gyroX = packFloat(gyroX, 100.0f);
-    data.gyroY = packFloat(gyroY, 100.0f);
-    data.gyroZ = packFloat(gyroZ, 100.0f);
+    data.gyroX = packFloat(gyroX, 1000.0f);
+    data.gyroY = packFloat(gyroY, 1000.0f);
+    data.gyroZ = packFloat(gyroZ, 1000.0f);
 
-    data.linX = packFloat(linX, 100.0f);
-    data.linY = packFloat(linY, 100.0f);
-    data.linZ = packFloat(linZ, 100.0f);
+    data.linX = packFloat(linX, 1000.0f);
+    data.linY = packFloat(linY, 1000.0f);
+    data.linZ = packFloat(linZ, 1000.0f);
 
     data.magX = packFloat(magX, 100.0f);
     data.magY = packFloat(magY, 100.0f);
@@ -126,4 +128,15 @@ IMUData IMUSensor::readData()
   Print_tx_rx.println();
 
   return data;
+}
+
+void IMUSensor::sleep()
+{
+  imu.modeSleep();
+}
+
+void IMUSensor::wake()
+{
+  imu.modeOn();
+  consecutiveFailures = 0;
 }

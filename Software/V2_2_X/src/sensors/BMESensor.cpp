@@ -29,9 +29,26 @@ BMEData BMESensor::readData()
 {
   BMEData data;
 
+  bme.takeForcedMeasurement();
+
   data.temp = int16_t(bme.readTemperature());
   data.pressure = int16_t(bme.readPressure() / 100.0F);
   data.humidity = int16_t(bme.readHumidity());
 
   return data;
+}
+
+void BMESensor::sleep()
+{
+  bme.setSampling(Adafruit_BME280::MODE_SLEEP);
+}
+
+void BMESensor::wake()
+{
+  // could also use Adafruit_BME280::MODE_ON
+  bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                  Adafruit_BME280::SAMPLING_X1, // temperature
+                  Adafruit_BME280::SAMPLING_X1, // pressure
+                  Adafruit_BME280::SAMPLING_X1, // humidity
+                  Adafruit_BME280::FILTER_OFF);
 }

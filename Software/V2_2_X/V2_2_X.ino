@@ -26,6 +26,26 @@ SystemManager SystemManager(Print_tx_rx, rfswitch_pins, rfswitch_table, GPS_RX, 
 
 void setup()
 {
+  Print_tx_rx.begin(9600);
+  delay(200); // let serial stabilize
+
+  uint32_t csr = RCC->CSR; // read reset flags directly
+
+  Print_tx_rx.print("Reset flags: 0x");
+  Print_tx_rx.println(csr, HEX);
+
+  if (csr & RCC_CSR_IWDGRSTF)
+    Print_tx_rx.println(">>> WATCHDOG RESET <<<");
+  if (csr & RCC_CSR_SFTRSTF)
+    Print_tx_rx.println(">>> SOFTWARE RESET <<<");
+  if (csr & RCC_CSR_PINRSTF)
+    Print_tx_rx.println(">>> PIN/POWER RESET <<<");
+  if (csr & RCC_CSR_BORRSTF)
+    Print_tx_rx.println(">>> BROWNOUT RESET <<<");
+
+  RCC->CSR |= RCC_CSR_RMVF;
+
+  // normal code:
   pinMode(PA9, OUTPUT);
   digitalWrite(PA9, LOW);
 
