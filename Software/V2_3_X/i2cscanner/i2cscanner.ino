@@ -12,15 +12,16 @@
 #define txPin PB6
 #include <SoftwareSerial.h>
 
-SoftwareSerial soft_tx_rx =  SoftwareSerial(rxPin, txPin);
+HardwareSerial soft_tx_rx =  HardwareSerial(rxPin, txPin);
 
 // Set I2C bus to use: Wire, Wire1, etc.
 #define WIRE Wire
 
 void setup() {
+  
   WIRE.begin();
 
-  soft_tx_rx.begin(9600);
+  soft_tx_rx.begin(115200);
   while (!soft_tx_rx)
      delay(10);
   soft_tx_rx.println("\nI2C Scanner");

@@ -74,6 +74,7 @@ void setup() {
   // initialize STM32WL with default settings, except frequency
   soft_tx_rx.print(F("[STM32WL] Initializing ... "));
   int state = radio.begin(915.0);
+  
 
   // EDIT ME:
   //radio.setOutputPower(14); // FOR LP = 14(?)
