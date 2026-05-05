@@ -13,18 +13,21 @@ BNO08x myIMU;
 #define Print_txPin PB6
 HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 
+#define blinky PA9
+
 void setup() {
   Print_tx_rx.begin(115200);
-
+  pinMode(blinky, OUTPUT);
   while (!Print_tx_rx) delay(10);  
+  
   Print_tx_rx.println();
   Print_tx_rx.println("BNO08x Read Example");
 
   Wire.begin();
- if (myIMU.begin(BNO08X_ADDR, Wire, BNO08X_INT, BNO08X_RST) == false) {
+  Wire.flush();
+  while (myIMU.begin(BNO08X_ADDR, Wire, BNO08X_INT, BNO08X_RST) == false) {
     Print_tx_rx.println("BNO08x not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
-    while (1)
-      ;
+    delay(2500); // Try to initialize IMU
   }
   Print_tx_rx.println("BNO08x found!");
 
@@ -47,7 +50,7 @@ void setReports(void) {
 }
 
 void loop() {
-  delay(10);
+  
 
   if (myIMU.wasReset()) {
     Print_tx_rx.print("sensor was reset ");
@@ -56,6 +59,7 @@ void loop() {
 
   // Has a new event come in on the Sensor Hub Bus?
   if (myIMU.getSensorEvent() == true) {
+    digitalWrite(blinky, HIGH);
 
     float x = myIMU.getLinAccelX();
     float y = myIMU.getLinAccelY();
@@ -70,4 +74,6 @@ void loop() {
     Print_tx_rx.println();
 
   }
+  delay(10);
+  digitalWrite(blinky, LOW);
 }

@@ -21,11 +21,11 @@ TinyGPSPlus gps;
 
 // The serial connection to the GPS device
 SoftwareSerial ss(GPS_rxPin, GPS_txPin);
-SoftwareSerial Print_tx_rx =  SoftwareSerial(Print_rxPin, Print_txPin);
+HardwareSerial Print_tx_rx =  HardwareSerial(Print_rxPin, Print_txPin);
 
 void setup()
 {
-  Print_tx_rx.begin(9600);
+  Print_tx_rx.begin(115200);
   ss.begin(GPSBaud);
 
   Print_tx_rx.println(F("DeviceExample.ino"));
