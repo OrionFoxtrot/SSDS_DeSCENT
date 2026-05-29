@@ -12,7 +12,7 @@
 #define Print_txPin PB6
 #include <SoftwareSerial.h>
 
-SoftwareSerial soft_tx_rx =  SoftwareSerial(Print_rxPin, Print_txPin);
+HardwareSerial soft_tx_rx =  HardwareSerial(Print_rxPin, Print_txPin);
 
 
 // no need to configure pins, signals are routed to the radio internally
@@ -61,7 +61,7 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 
 
 void setup() {
-  soft_tx_rx.begin(9600);
+  soft_tx_rx.begin(115200);
 
   pinMode(PA9, OUTPUT);
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
@@ -110,7 +110,7 @@ void loop() {
 
   // you can transmit C-string or Arduino string up to
   // 256 characters long
-  String str = "Hello World! #" + String(count++);
+  String str = String(count++);
   int state = radio.transmit(str);
 
   // you can also transmit byte array up to 256 bytes long
@@ -148,6 +148,6 @@ void loop() {
   digitalWrite(PA9, HIGH);  // turn the LED on (HIGH is the voltage level)
   delay(1000);                      // wait for a second
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
-  delay(1000);
+  delay(1.8e+6);
 }
 

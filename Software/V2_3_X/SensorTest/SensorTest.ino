@@ -214,7 +214,7 @@ String getIMUInfo() {
   int(IMU_X), int(IMU_Y), int(IMU_Z) 
   */
   String str = "";
-  float x = 0;
+  float x = 0 ;
   float y = 0;
   float z = 0;
 

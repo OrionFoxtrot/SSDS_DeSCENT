@@ -8,10 +8,11 @@
 
 #define Print_rxPin PB7
 #define Print_txPin PB6
-#include <SoftwareSerial.h>
+
 
 #define GPS_rxPin PC1
 #define GPS_txPin PC0
+#include <SoftwareSerial.h>
 
 //static const int RXPin = 4, TXPin = 3;
 static const uint32_t GPSBaud = 9600;

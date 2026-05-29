@@ -14,10 +14,12 @@ BNO08x myIMU;
 HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 
 #define blinky PA9
-
+#define GPS_RESET PB5
 void setup() {
   Print_tx_rx.begin(115200);
   pinMode(blinky, OUTPUT);
+  pinMode(GPS_RESET, OUTPUT);
+  digitalWrite(GPS_RESET,HIGH);
   while (!Print_tx_rx) delay(10);  
   
   Print_tx_rx.println();
