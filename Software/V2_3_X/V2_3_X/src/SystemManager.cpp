@@ -87,7 +87,7 @@ void SystemManager::loop()
   // debug.println(&stackDummy - heapEnd);
 
   payload_.gpsData = gps.readData();
-  applyDutyCycle();
+  //applyDutyCycle();
 
   if (imuBmeAwake_)
   {
@@ -102,8 +102,8 @@ void SystemManager::loop()
       payload_.imuData = imu.readData();
     }
   }
-  // payload_.bmeData = bme.readData();
-  // payload_.imuData = imu.readData();
+  payload_.bmeData = bme.readData();
+  payload_.imuData = imu.readData();
   // if (state_ == SensorState::FALLING)
   // {
   //   applyDutyCycle();

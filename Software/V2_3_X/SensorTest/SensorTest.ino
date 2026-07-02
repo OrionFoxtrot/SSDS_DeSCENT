@@ -109,7 +109,7 @@ int procMax = 1000;
 int procChar = 0;
 
 void loop() {
-  digitalWrite(blinky, HIGH);
+  digitalWrite(blinky, LOW);
   while (GPS_tx_rx.available() > 0) {
      gps.encode(GPS_tx_rx.read());
      if(++procChar >= procMax){
@@ -129,9 +129,10 @@ void loop() {
 
   
   Print_tx_rx.println("Looping...");
-  
-  delay(5000);
-  digitalWrite(blinky, LOW);
+
+  digitalWrite(blinky, HIGH);
+    
+  delay(1000);
   
 }
 void displayInfo(String *str) {

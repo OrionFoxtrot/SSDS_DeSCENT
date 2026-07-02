@@ -10,10 +10,11 @@
 
 #define Print_rxPin PB7
 #define Print_txPin PB6
+
+
 #include <SoftwareSerial.h>
 
 HardwareSerial soft_tx_rx =  HardwareSerial(Print_rxPin, Print_txPin);
-
 
 // no need to configure pins, signals are routed to the radio internally
 STM32WLx radio = new STM32WLx_Module();
@@ -110,7 +111,10 @@ void loop() {
 
   // you can transmit C-string or Arduino string up to
   // 256 characters long
-  String str = String(count++);
+
+  String str = "Counter: " + String(count++) + // Dummy String
+             ", Voltage: 3.81 V, Battery: 32.6 %, Temp: 34";
+  // String str = String(count++);
   int state = radio.transmit(str);
 
   // you can also transmit byte array up to 256 bytes long
@@ -146,8 +150,9 @@ void loop() {
   // wait for a second before transmitting again
   soft_tx_rx.print("Looping...");
   digitalWrite(PA9, HIGH);  // turn the LED on (HIGH is the voltage level)
-  delay(1000);                      // wait for a second
+  delay(500);                      // wait for a second
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
-  delay(1.8e+6);
+  // delay(1.8e+6);
+  delay(500);
 }
 

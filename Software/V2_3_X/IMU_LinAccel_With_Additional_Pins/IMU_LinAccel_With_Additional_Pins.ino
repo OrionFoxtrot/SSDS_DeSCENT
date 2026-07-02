@@ -4,10 +4,9 @@
 #include "SparkFun_BNO08x_Arduino_Library.h"  // CTRL+Click here to get the library: http://librarymanager/All#SparkFun_BNO08x
 BNO08x myIMU;
 
-
-#define BNO08X_INT  -1
-#define BNO08X_RST  -1
-//int pb3, rst pb4
+// int pb3, rst pb4
+#define BNO08X_INT PB3 // not used
+#define BNO08X_RST PB4 // not used
 #define BNO08X_ADDR 0x4A  // Alternate address if ADR jumper is closed
 
 #define Print_rxPin PB7
@@ -15,23 +14,20 @@ BNO08x myIMU;
 HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 
 #define blinky PA9
-#define GPS_RESET PB5
+
 void setup() {
   Print_tx_rx.begin(115200);
   pinMode(blinky, OUTPUT);
-  pinMode(BNO08X_INT, INPUT_PULLUP);   // physical pullup already exists
-  pinMode(BNO08X_RST, OUTPUT);
-  digitalWrite(BNO08X_RST, HIGH);
-
+  pinMode(BNO08X_INT, INPUT_PULLUP);
+  pinMode(BNO08X_RST,OUTPUT);
   while (!Print_tx_rx) delay(10);  
   
   Print_tx_rx.println();
   Print_tx_rx.println("BNO08x Read Example");
 
   Wire.begin();
-  // Wire.setClock(400000);
   Wire.flush();
-  while (myIMU.begin(BNO08X_ADDR, Wire, -1, -1) == false) {
+  while (myIMU.begin(BNO08X_ADDR, Wire, BNO08X_INT, BNO08X_RST) == false) {
     Print_tx_rx.println("BNO08x not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
     delay(2500); // Try to initialize IMU
   }
@@ -59,14 +55,17 @@ void loop() {
   
 
   if (myIMU.wasReset()) {
-    delay(100);
     Print_tx_rx.print("sensor was reset ");
     Print_tx_rx.print("BNO reset, reason=");
     Print_tx_rx.println(myIMU.getResetReason());
+    Wire.flush();
+    delay(1000);
     setReports();
+    delay(1000);
   }
 
   // Has a new event come in on the Sensor Hub Bus?
+  // Print_tx_rx.println(myIMU.getSensorEvent());
   if (myIMU.getSensorEvent() == true) {
     digitalWrite(blinky, HIGH);
 

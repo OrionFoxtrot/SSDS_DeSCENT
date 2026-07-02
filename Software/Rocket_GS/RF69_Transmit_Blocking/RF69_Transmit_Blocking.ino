@@ -22,10 +22,10 @@
 #include <RadioLib.h>
 
 // RF69 has the following connections:
-// CS pin:    7
+// CS pin:    7 => 10 (PCB)
 // DIO0 pin:  2
-// RESET pin: 3
-RF69 radio = new Module(7, 2, 3);
+// RESET pin: 3 => 4 (PCB)
+RF69 radio = new Module(10, 2, 4);
 
 // or detect the pinout automatically using RadioBoards
 // https://github.com/radiolib-org/RadioBoards
@@ -36,7 +36,7 @@ Radio radio = new RadioModule();
 */
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // initialize RF69 with default settings
   Serial.print(F("[RF69] Initializing ... "));
@@ -97,5 +97,5 @@ void loop() {
   }
 
   // wait for a second before transmitting again
-  delay(5);
+  delay(1000);
 }
