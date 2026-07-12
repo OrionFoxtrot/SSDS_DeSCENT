@@ -3,7 +3,7 @@
 
 // extern "C" char *sbrk(int i);
 
-SystemManager::SystemManager(SoftwareSerial &debugSerial,
+SystemManager::SystemManager(HardwareSerial &debugSerial,
                              std::array<uint32_t, 5> rfswitch_pins,
                              std::array<Module::RfSwitchMode_t, 5> rfswitch_table,
                              uint8_t gpsRxPin,
@@ -17,7 +17,7 @@ SystemManager::SystemManager(SoftwareSerial &debugSerial,
 
 void SystemManager::begin()
 {
-  debug.begin(9600); // 115200 baud
+  debug.begin(115200);
   debug.println("In the process");
   // Initialize sensors
   imu.begin();

@@ -26,7 +26,7 @@ SystemManager SystemManager(Print_tx_rx, rfswitch_pins, rfswitch_table, GPS_RX, 
 
 void setup()
 {
-  Print_tx_rx.begin(9600);
+  Print_tx_rx.begin(115200);
   delay(200); // let serial stabilize
 
   uint32_t csr = RCC->CSR; // read reset flags directly

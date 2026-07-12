@@ -21,7 +21,7 @@
 
 TinyGPSPlus gps;
 
-SoftwareSerial Print_tx_rx = SoftwareSerial(Print_rxPin, Print_txPin);
+HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 SoftwareSerial GPS_tx_rx = SoftwareSerial(GPS_rxPin, GPS_txPin);
 
 
@@ -62,7 +62,7 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 
 
 void setup() {
-  Print_tx_rx.begin(9600);
+  Print_tx_rx.begin(115200);
   GPS_tx_rx.begin(9600);
 
   pinMode(PA9, OUTPUT);
@@ -76,6 +76,7 @@ void setup() {
   // initialize STM32WL with default settings, except frequency
   Print_tx_rx.print(F("[STM32WL] Initializing ... "));
   int state = radio.begin(915.0,125);
+  
   radio.setOutputPower(14);
   if (state == RADIOLIB_ERR_NONE) {
     Print_tx_rx.println(F("success!"));
@@ -163,7 +164,7 @@ void loop() {
   digitalWrite(PA9, HIGH);  // turn the LED on (HIGH is the voltage level)
   delay(1000);              // wait for a second
   digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
-  delay(1000);
+  delay(20000);
 }
 
 void displayInfo(String *str) {

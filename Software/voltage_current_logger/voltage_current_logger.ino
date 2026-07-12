@@ -15,11 +15,18 @@ void setup() {
   }
   Serial.println("Found INA260 chip");
 }
-
+float peak = 0;
+float busV = 0;
+float busI = 0;
 void loop() {
-  Serial.println(String(ina260.readBusVoltage())+','+String(ina260.readCurrent()));
+  busV = ina260.readBusVoltage();
+  if(busI>peak){
+    peak = busI;
+  }
+  busI = ina260.readCurrent();
+  Serial.println(String(busV)+','+String(busI)+","+String(peak));
   
 
   //Serial.println();
-  delay(1000);
+  delay(100);
 }

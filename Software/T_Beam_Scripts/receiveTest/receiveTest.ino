@@ -20,8 +20,8 @@
 
 // Josh Recomended:
 float freq = 915;
-float bw = 62.5;
-int sf = 12;
+float bw = 125;
+int sf = 9;
 int cr = 7;
 int sw = RADIOLIB_SX126X_SYNC_WORD_PRIVATE;
 int pwr = 20;

@@ -21,26 +21,33 @@
 
   https://www.arduino.cc/en/Tutorial/BuiltInExamples/Blink
 */
-#include <SoftwareSerial.h>
+
 
 //#define rxPin PC1
 //#define txPin PC0
 
-#define rxPin PB7
-#define txPin PB6
-
-SoftwareSerial soft_tx_rx =  SoftwareSerial(rxPin, txPin);
+#define Print_rxPin PB7
+#define Print_txPin PB6
+#define blinkypin PA9
+#define APinInQuestion PB3
+HardwareSerial soft_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 
 
 // the setup function runs once when you press reset or power the board
 void setup() {
-    pinMode(rxPin, INPUT);
-    pinMode(txPin, OUTPUT);
 
-    soft_tx_rx.begin(9600);
+
+
+  soft_tx_rx.begin(115200);
+  soft_tx_rx.print("Blinky Pin #: ");
+  soft_tx_rx.println(blinkypin);
+
+  soft_tx_rx.print("APinInQuestion #:");
+  soft_tx_rx.println(APinInQuestion);
+  
   
   // initialize digital pin LED_BUILTIN as an output.
-  pinMode(PA9, OUTPUT);
+  pinMode(blinkypin, OUTPUT);
   
 }
 int counter = 0;
@@ -50,8 +57,8 @@ void loop() {
   soft_tx_rx.print("hello world counter k:");
   soft_tx_rx.println(counter);
 
-  digitalWrite(PA9, HIGH);  // turn the LED on (HIGH is the voltage level)
+  digitalWrite(blinkypin, HIGH);  // turn the LED on (HIGH is the voltage level)
   delay(2000);                      // wait for a second
-  digitalWrite(PA9, LOW);   // turn the LED off by making the voltage LOW
+  digitalWrite(blinkypin, LOW);   // turn the LED off by making the voltage LOW
   delay(2000);                      // wait for a second
 }

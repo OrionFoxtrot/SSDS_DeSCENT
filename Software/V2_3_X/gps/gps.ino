@@ -8,10 +8,11 @@
 
 #define Print_rxPin PB7
 #define Print_txPin PB6
-#include <SoftwareSerial.h>
+
 
 #define GPS_rxPin PC1
 #define GPS_txPin PC0
+#include <SoftwareSerial.h>
 
 //static const int RXPin = 4, TXPin = 3;
 static const uint32_t GPSBaud = 9600;
@@ -21,11 +22,11 @@ TinyGPSPlus gps;
 
 // The serial connection to the GPS device
 SoftwareSerial ss(GPS_rxPin, GPS_txPin);
-SoftwareSerial Print_tx_rx =  SoftwareSerial(Print_rxPin, Print_txPin);
+HardwareSerial Print_tx_rx =  HardwareSerial(Print_rxPin, Print_txPin);
 
 void setup()
 {
-  Print_tx_rx.begin(9600);
+  Print_tx_rx.begin(115200);
   ss.begin(GPSBaud);
 
   Print_tx_rx.println(F("DeviceExample.ino"));

@@ -88,6 +88,7 @@ title('ChipSat Drop: Velocity vs Altitude');
 end
 set(gca,'fontsize', 20) 
 set(gca, 'XDir', 'reverse'); 
+sprintf("Final Velocity %.3f ms^-1", v(length(v)))
 
 
 

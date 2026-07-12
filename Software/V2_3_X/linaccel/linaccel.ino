@@ -1,76 +1,88 @@
-/*
-  Using the BNO080 IMU
-  By: Nathan Seidle
-  SparkFun Electronics
-  Date: December 21st, 2017
-  SparkFun code, firmware, and software is released under the MIT License.
-	Please see LICENSE.md for further details.
-
-  Feel like supporting our work? Buy a board from SparkFun!
-  https://www.sparkfun.com/products/14586
-
-  This example shows how to output accelerometer values
-
-  Hardware Connections:
-  Attach the Qwiic Shield to your Arduino/Photon/ESP32 or other
-  Plug the sensor onto the shield
-  Serial.print it out at 115200 baud to serial monitor.
-*/
 
 #include <Wire.h>
-#include <Wire.h>
 
-//#define Print_rxPin PC1
-//#define Print_txPin PC0
+#include "SparkFun_BNO08x_Arduino_Library.h"  // CTRL+Click here to get the library: http://librarymanager/All#SparkFun_BNO08x
+BNO08x myIMU;
+
+
+#define BNO08X_INT  -1
+#define BNO08X_RST  -1
+//int pb3, rst pb4
+#define BNO08X_ADDR 0x4A  // Alternate address if ADR jumper is closed
+
 #define Print_rxPin PB7
 #define Print_txPin PB6
-#include <SoftwareSerial.h>
+HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 
-SoftwareSerial Print_tx_rx =  SoftwareSerial(Print_rxPin, Print_txPin);
+#define blinky PA9
+#define GPS_RESET PB5
+void setup() {
+  Print_tx_rx.begin(115200);
+  pinMode(blinky, OUTPUT);
+  pinMode(BNO08X_INT, INPUT_PULLUP);   // physical pullup already exists
+  pinMode(BNO08X_RST, OUTPUT);
+  digitalWrite(BNO08X_RST, HIGH);
 
-#include "SparkFun_BNO080_Arduino_Library.h" // Click here to get the library: http://librarymanager/All#SparkFun_BNO080
-BNO080 myIMU;
-
-void setup()
-{
-  Print_tx_rx.begin(9600);
+  while (!Print_tx_rx) delay(10);  
+  
   Print_tx_rx.println();
-  Print_tx_rx.println("BNO080 Read Example");
+  Print_tx_rx.println("BNO08x Read Example");
 
   Wire.begin();
+  // Wire.setClock(400000);
+  Wire.flush();
+  while (myIMU.begin(BNO08X_ADDR, Wire, -1, -1) == false) {
+    Print_tx_rx.println("BNO08x not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
+    delay(2500); // Try to initialize IMU
+  }
+  Print_tx_rx.println("BNO08x found!");
 
-  myIMU.begin(0x4A);
+  setReports();
 
-  Wire.setClock(400000); //Increase I2C data rate to 400kHz
-
-  myIMU.enableLinearAccelerometer(50); //Send data update every 50ms
-
-  Print_tx_rx.println(F("Linear Accelerometer enabled"));
-  Print_tx_rx.println(F("Output in form x, y, z, in m/s^2"));
-  pinMode(PA9, OUTPUT);
+  Print_tx_rx.println("Reading events");
+  delay(100);
 }
 
-void loop()
-{
-  //Look for reports from the IMU
-  if (myIMU.dataAvailable() == true)
-  {
-    digitalWrite(PA9,HIGH);
+// Here is where you define the sensor outputs you want to receive
+void setReports(void) {
+  Print_tx_rx.println("Setting desired reports");
+  
+  if (myIMU.enableLinearAccelerometer() == true) {
+    Print_tx_rx.println(F("Accelerometer enabled"));
+    Print_tx_rx.println(F("Output in form x, y, z, in m/s^2"));
+  } else {
+    Print_tx_rx.println("Could not enable accelerometer");
+  }
+}
+
+void loop() {
+  
+
+  if (myIMU.wasReset()) {
+    delay(100);
+    Print_tx_rx.print("sensor was reset ");
+    Print_tx_rx.print("BNO reset, reason=");
+    Print_tx_rx.println(myIMU.getResetReason());
+    setReports();
+  }
+
+  // Has a new event come in on the Sensor Hub Bus?
+  if (myIMU.getSensorEvent() == true) {
+    digitalWrite(blinky, HIGH);
+
     float x = myIMU.getLinAccelX();
     float y = myIMU.getLinAccelY();
     float z = myIMU.getLinAccelZ();
-    byte linAccuracy = myIMU.getLinAccelAccuracy();
 
     Print_tx_rx.print(x, 2);
     Print_tx_rx.print(F(","));
     Print_tx_rx.print(y, 2);
     Print_tx_rx.print(F(","));
     Print_tx_rx.print(z, 2);
-    Print_tx_rx.print(F(","));
-    Print_tx_rx.print(linAccuracy);
 
     Print_tx_rx.println();
-    
+
   }
-  digitalWrite(PA9,LOW);
+  delay(10);
+  digitalWrite(blinky, LOW);
 }

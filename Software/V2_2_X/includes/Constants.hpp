@@ -9,8 +9,8 @@
 #include <HardwareSerial.h>
 #include <SoftwareSerial.h>
 
-extern SoftwareSerial Print_tx_rx;
-extern HardwareSerial GPS_tx_rx;
+extern HardwareSerial Print_tx_rx;
+extern SoftwareSerial GPS_tx_rx;
 
 // tbd
 constexpr uint32_t DUTY_CYCLE_PERIOD_MS = 20000;
