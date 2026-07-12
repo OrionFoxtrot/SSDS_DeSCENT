@@ -25,35 +25,61 @@
 // CS pin:    7 => 10 (PCB)
 // DIO0 pin:  2
 // RESET pin: 3 => 4 (PCB)
-RF69 radio = new Module(10, 2, 4);
+#define RFM_CS 10
+#define RFM_DIO0 2
+#define RFM_RST 4
+RF69 radio = new Module(RFM_CS, RFM_DIO0, RFM_RST);
 
-// or detect the pinout automatically using RadioBoards
-// https://github.com/radiolib-org/RadioBoards
-/*
-#define RADIO_BOARD_AUTO
-#include <RadioBoards.h>
-Radio radio = new RadioModule();
-*/
+#define blinkypin 9
+void manualRFM69Reset() {
+  pinMode(RFM_RST, OUTPUT);
 
+  digitalWrite(RFM_RST, LOW);
+  delay(10);
+
+  digitalWrite(RFM_RST, HIGH);   // active high reset
+  delay(10);
+
+  digitalWrite(RFM_RST, LOW);    // release reset
+  delay(100);
+}
 void setup() {
   Serial.begin(115200);
 
+  pinMode(blinkypin, OUTPUT);
+  digitalWrite(blinkypin, LOW);    // keep translator disabled first
+
+  pinMode(RFM_CS, OUTPUT);
+  digitalWrite(RFM_CS, HIGH);   // deselect radio
+
+  pinMode(RFM_RST, OUTPUT);
+  digitalWrite(RFM_RST, LOW);   // do not hold radio in reset
+
+  delay(500);                   // let rails settle
+
+  digitalWrite(blinkypin, HIGH);   // enable translator only after pins are sane
+  delay(500);
+
+  manualRFM69Reset();
   // initialize RF69 with default settings
-  Serial.print(F("[RF69] Initializing ... "));
+  Serial.println(F("[RF69] Initializing ... "));
+
+  
   int state = radio.begin(915.0);
-  if (state == RADIOLIB_ERR_NONE) {
-    Serial.println(F("success!"));
-  } else {
+  while(state != RADIOLIB_ERR_NONE){
     Serial.print(F("failed, code "));
     Serial.println(state);
-    while (true) { delay(10); }
+    Serial.println("Trying to initialize again");
+    Serial.println("Hint, if you're connected to the CityLabs Programmer, press the power rest button");
+
+    manualRFM69Reset();
+    digitalWrite(blinkypin, LOW);
+    delay(100);
+    digitalWrite(blinkypin, HIGH);
+
+    state = radio.begin(915.0);
   }
 
-  // NOTE: some RF69 modules use high power output,
-  //       those are usually marked RF69H(C/CW).
-  //       To configure RadioLib for these modules,
-  //       you must call setOutputPower() with
-  //       second argument set to true.
 
   Serial.print(F("[RF69] Setting high power module ... "));
   state = radio.setOutputPower(20, true);
@@ -64,6 +90,8 @@ void setup() {
     Serial.println(state);
     while (true) { delay(10); }
   }
+
+  // delay(9999999999999999999);
 }
 
 // counter to keep track of transmitted packets
@@ -76,11 +104,6 @@ void loop() {
   String str = "Hello World! #" + String(count++);
   int state = radio.transmit(str);
 
-  // you can also transmit byte array up to 64 bytes long
-  /*
-    byte byteArr[] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF};
-    int state = radio.transmit(byteArr, 8);
-  */
 
   if (state == RADIOLIB_ERR_NONE) {
     // the packet was successfully transmitted
@@ -95,7 +118,5 @@ void loop() {
     Serial.print(F("failed, code "));
     Serial.println(state);
   }
-
-  // wait for a second before transmitting again
   delay(1000);
 }

@@ -39,13 +39,13 @@ unsigned long delayTime;
 #define rxPin PB7
 #define txPin PB6
 
-SoftwareSerial Print_tx_rx =  SoftwareSerial(rxPin, txPin);
+HardwareSerial Print_tx_rx =  HardwareSerial(rxPin, txPin);
 
 
 
 void setup() {
-    Print_tx_rx.begin(9600);
-    //while(!Serial);    // time to get serial running
+    Print_tx_rx.begin(115200);
+    while(!Print_tx_rx);    // time to get serial running
     Print_tx_rx.println(F("BME280 test"));
 
     unsigned status;
@@ -54,7 +54,7 @@ void setup() {
     //status = bme.begin();  
     // You can also pass in a Wire library object like &Wire2
     Print_tx_rx.println('hello world');
-    status = bme.begin();
+    status = bme.begin(0x77);
     
     if (!status) {
         Print_tx_rx.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");

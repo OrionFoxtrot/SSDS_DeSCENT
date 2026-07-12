@@ -49,26 +49,6 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 };
 
 
-// Dont think this works:
-
-// FOR HIGH POWERED START
-// static const Module::RfSwitchMode_t rfswitch_table[] = {
-//   {STM32WLx::MODE_IDLE, {LOW, LOW}},
-//   {STM32WLx::MODE_RX, {HIGH, LOW}},
-//   {STM32WLx::MODE_TX_HP, {LOW, HIGH}}, // for LoRa-E5 mini
-//   END_OF_MODE_TABLE,
-// };
-// FOR HIGH POWERED END
-
-/*
-static const Module::RfSwitchMode_t rfswitch_table[] = {
-  {STM32WLx::MODE_IDLE,  {LOW, LOW}},
-  {STM32WLx::MODE_RX,    {HIGH, LOW}},
-  {STM32WLx::MODE_TX_LP, {HIGH, HIGH}}, // for LoRa-E5-LE mini
-  END_OF_MODE_TABLE,
-};
-
-*/
 
 
 void setup() {
@@ -88,7 +68,7 @@ void setup() {
 
   // EDIT ME:
   //radio.setOutputPower(14); // FOR LP = 14(?)
-  radio.setOutputPower(22); // For HP = 20-22
+  radio.setOutputPower(14); // For HP = 20-22
 
 
   if (state == RADIOLIB_ERR_NONE) {

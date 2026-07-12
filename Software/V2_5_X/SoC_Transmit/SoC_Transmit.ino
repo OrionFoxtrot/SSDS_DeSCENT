@@ -76,7 +76,8 @@ void setup() {
 
   // EDIT ME:
   //radio.setOutputPower(14); // FOR LP = 14(?)
-  radio.setOutputPower(20);  // For HP = 20-22
+  // radio.setOutputPower(20);  // For HP = 20-22
+  radio.setOutputPower(22);
 
 
   if (state == RADIOLIB_ERR_NONE) {
