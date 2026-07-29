@@ -1,4 +1,4 @@
-// LoRaRadio.h
+// GPSModule.h
 #pragma once
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
@@ -12,7 +12,13 @@ public:
   bool begin(long baud);
   GPSData readData();
 
+  bool setAirborneMode();     // configure dynamic model to Airborne <2g
+  bool confirmAirborneMode(); // poll and verify the setting took effect
+
 private:
   TinyGPSPlus gps;
-  SoftwareSerial gpsSerial;
+  HardwareSerial gpsSerial;
+
+  bool readUBX(uint8_t *buf, uint8_t len, uint16_t timeout_ms);
+  void calcChecksum(uint8_t *buf, uint8_t len, uint8_t &ckA, uint8_t &ckB);
 };

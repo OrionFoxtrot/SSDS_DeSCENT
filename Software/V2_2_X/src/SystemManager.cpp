@@ -1,7 +1,7 @@
 #include "includes/SystemManager.hpp"
 #include "includes/Constants.hpp"
 
-extern "C" char *sbrk(int i);
+// extern "C" char *sbrk(int i);
 
 SystemManager::SystemManager(HardwareSerial &debugSerial,
                              std::array<uint32_t, 5> rfswitch_pins,
@@ -85,7 +85,6 @@ void SystemManager::loop()
   // char stackDummy;
   // debug.print("Free mem: ");
   // debug.println(&stackDummy - heapEnd);
-
   payload_.gpsData = gps.readData();
   applyDutyCycle();
 
