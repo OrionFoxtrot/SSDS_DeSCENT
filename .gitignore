@@ -41,5 +41,6 @@
 *.dwo
 
 # Ignore specific folders
-GPS_Sleep_Test/
 oldV2_5_X_Code/
+V2_5_X_Code_GPS_Blocking_Airborne_Sleep_TX/
+powerTesting/
