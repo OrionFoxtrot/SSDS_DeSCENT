@@ -5,8 +5,8 @@
 BNO08x myIMU;
 
 // int pb3, rst pb4
-#define BNO08X_INT PB3 // not used
-#define BNO08X_RST PB4 // not used
+#define BNO08X_INT -1 // not used PB3
+#define BNO08X_RST -1 // not used PB4
 #define BNO08X_ADDR 0x4A  // Alternate address if ADR jumper is closed
 
 #define Print_rxPin PB7

@@ -1,11 +1,15 @@
 #include "Sensors.h"
-#include "Debug.h"
 
 #include <math.h>
 
 namespace ChipSatSensors {
 
 namespace {
+// DEBUG_PRINT verbosity levels:
+//   0 = no terminal output
+//   1 = status, state changes, and errors
+//   2 = level 1 plus detailed IMU diagnostics
+
 constexpr uint8_t kInitializationAttempts = 5;         // Maximum number of times to retry initializing each sensor.
 constexpr uint8_t kReportEnableAttempts = 5;           // Maximum number of attempts to enable each BNO08x report.
 constexpr uint16_t kInitializationRetryDelayMs = 500;  // Delay between failed sensor initialization attempts.
@@ -60,8 +64,6 @@ bool Sensors::begin(Stream *debugPort,
   _wire.setSCL(PB15);
 
   _wire.begin();
-  _wire.flush();
-
   _gpsSerial.begin(_gpsBaud);
 
   _imuReady = beginIMU();
@@ -83,7 +85,7 @@ void Sensors::service() {
 }
 
 bool Sensors::beginIMU() {
-  if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Initializing BNO08x..."));
   }
 
@@ -94,13 +96,13 @@ bool Sensors::beginIMU() {
                    CHIPSAT_BNO08X_INT_PIN,
                    CHIPSAT_BNO08X_RST_PIN)) {
       if (configureIMUReports(kIMUInitialStartupDelayMs)) {
-        if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+        if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
           _debugPort->println(F("BNO08x initialized"));
         }
         return true;
       }
 
-      if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
         _debugPort->println(F("BNO08x found, but one or more reports failed to enable"));
       }
       return false;
@@ -109,7 +111,7 @@ bool Sensors::beginIMU() {
     delay(kInitializationRetryDelayMs);
   }
 
-  if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("BNO08x initialization failed"));
   }
   return false;
@@ -162,7 +164,7 @@ bool Sensors::configureIMUReports(uint16_t startupDelayMs) {
                          : kReportEnableRetryDelayMs);
   }
 
-  if (ChipSatDebug::allOnly() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->print(F("Accel OK: "));
     _debugPort->println(accelerationOkay);
     _debugPort->print(F("Gyro OK: "));
@@ -178,7 +180,7 @@ bool Sensors::configureIMUReports(uint16_t startupDelayMs) {
 
 bool Sensors::waitForFreshIMUData(uint16_t timeoutMs) {
   if (!_imuReady || _imuSleeping) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot collect fresh IMU data: BNO08x is unavailable"));
     }
     return false;
@@ -231,7 +233,7 @@ bool Sensors::waitForFreshIMUData(uint16_t timeoutMs) {
     delay(2);
   } while (static_cast<uint32_t>(millis() - startMs) < timeoutMs);
 
-  if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->print(F("Fresh IMU data timed out; missing:"));
 
     if ((freshReports & kFreshLinearAccelerationBit) == 0) {
@@ -254,7 +256,7 @@ bool Sensors::waitForFreshIMUData(uint16_t timeoutMs) {
 }
 
 bool Sensors::beginGPS() {
-  if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Initializing MAX-M10S GNSS over UART..."));
   }
 
@@ -272,14 +274,14 @@ bool Sensors::beginGPS() {
 
       _gpsHasEverLocked = false;
 
-      if (uartOkay && airborneOkay && normalModeOkay) {
-        if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
+        if (uartOkay && airborneOkay && normalModeOkay) {
           _debugPort->print(F("MAX-M10S initialized: airborne dynamic model "));
           _debugPort->print(static_cast<uint8_t>(CHIPSAT_GPS_DYNAMIC_MODEL));
           _debugPort->println(F(", normal continuous acquisition/tracking"));
+        } else {
+          _debugPort->println(F("MAX-M10S initialized, but startup configuration was incomplete"));
         }
-      } else if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
-        _debugPort->println(F("MAX-M10S initialized, but startup configuration was incomplete"));
       }
 
       return uartOkay && airborneOkay && normalModeOkay;
@@ -288,7 +290,7 @@ bool Sensors::beginGPS() {
     delay(kInitializationRetryDelayMs);
   }
 
-  if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("MAX-M10S GNSS initialization failed"));
   }
   return false;
@@ -321,7 +323,7 @@ bool Sensors::configureGPSAirborneMode() {
     static_cast<uint8_t>(CHIPSAT_GPS_DYNAMIC_MODEL),
     kGPSConfigLayers);
 
-  if (!okay && ChipSatDebug::errors() && (_debugPort != nullptr)) {
+  if (!okay && (DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Failed to set MAX-M10S airborne dynamic model"));
   }
 
@@ -330,13 +332,13 @@ bool Sensors::configureGPSAirborneMode() {
 
 
 bool Sensors::beginStateOfCharge() {
-  if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Initializing MAX17048 fuel gauge..."));
   }
 
   for (uint8_t attempt = 0; attempt < kInitializationAttempts; ++attempt) {
     if (_fuelGauge.begin(&_wire)) {
-      if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
         _debugPort->println(F("MAX17048 initialized"));
       }
       return true;
@@ -345,20 +347,20 @@ bool Sensors::beginStateOfCharge() {
     delay(kInitializationRetryDelayMs);
   }
 
-  if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("MAX17048 initialization failed"));
   }
   return false;
 }
 
 bool Sensors::beginEnvironmental() {
-  if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Initializing BME280..."));
   }
 
   for (uint8_t attempt = 0; attempt < kInitializationAttempts; ++attempt) {
     if (_bme280.begin(CHIPSAT_BME280_ADDRESS, &_wire)) {
-      if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
         _debugPort->println(F("BME280 initialized"));
       }
       return true;
@@ -367,7 +369,7 @@ bool Sensors::beginEnvironmental() {
     delay(kInitializationRetryDelayMs);
   }
 
-  if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("BME280 initialization failed"));
   }
   return false;
@@ -379,14 +381,14 @@ bool Sensors::updateIMU() {
   }
 
   if (_imu.wasReset()) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("BNO08x reset detected; reenabling reports"));
     }
     invalidateIMUData();
     _imuReady = configureIMUReports(kIMUWakeStartupDelayMs);
 
     if (!_imuReady) {
-      if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
         _debugPort->println(F("Failed to reenable BNO08x reports"));
       }
       return false;
@@ -458,9 +460,6 @@ bool Sensors::readGPS(uint16_t maxWaitMs) {
   // then copied in their native compact integer formats.
   if (!_gps.getPVT(maxWaitMs)) {
     data.gps.valid = false;
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
-      _debugPort->println(F("MAX-M10S PVT read failed or timed out"));
-    }
     return false;
   }
 
@@ -484,13 +483,13 @@ bool Sensors::readGPS(uint16_t maxWaitMs) {
 bool Sensors::waitForGPSFix(uint32_t statusIntervalMs,
                             uint16_t pollWaitMs) {
   if (!_gpsReady) {
-    if (ChipSatDebug::bootOrErrors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot wait for GPS fix: MAX-M10S is unavailable"));
     }
     return false;
   }
 
-  if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
     _debugPort->println(F("Waiting in setup for a valid MAX-M10S GPS fix..."));
   }
 
@@ -504,25 +503,22 @@ bool Sensors::waitForGPSFix(uint32_t statusIntervalMs,
 
     const bool fixOkay = readGPS(pollWaitMs);
     if (fixOkay) {
-      if (ChipSatDebug::boot() && (_debugPort != nullptr)) {
+      if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
         _debugPort->print(F("GPS fix acquired after "));
         _debugPort->print(static_cast<uint32_t>((millis() - startMs) / 1000U));
         _debugPort->println(F(" s; remaining in normal continuous tracking"));
-      }
-
-      if (ChipSatDebug::sensorData() && (_debugPort != nullptr)) {
-        _debugPort->print(F("GPS_FIX,"));
-        _debugPort->print(data.gps.latitudeE7);
-        _debugPort->print(',');
-        _debugPort->print(data.gps.longitudeE7);
-        _debugPort->print(',');
+        _debugPort->print(F("Latitude E7: "));
+        _debugPort->println(data.gps.latitudeE7);
+        _debugPort->print(F("Longitude E7: "));
+        _debugPort->println(data.gps.longitudeE7);
+        _debugPort->print(F("Altitude MSL mm: "));
         _debugPort->println(data.gps.altitudeMSLmm);
       }
       return true;
     }
 
     const uint32_t now = millis();
-    if (ChipSatDebug::boot() && (_debugPort != nullptr) && static_cast<uint32_t>(now - previousStatusMs) >= statusIntervalMs) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr) && static_cast<uint32_t>(now - previousStatusMs) >= statusIntervalMs) {
       previousStatusMs = now;
       _debugPort->print(F("Still waiting for GPS fix; elapsed "));
       _debugPort->print(static_cast<uint32_t>((now - startMs) / 1000U));
@@ -536,9 +532,6 @@ bool Sensors::waitForGPSFix(uint32_t statusIntervalMs,
 bool Sensors::readStateOfCharge() {
   if (!_stateOfChargeReady) {
     data.stateOfCharge.valid = false;
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
-      _debugPort->println(F("MAX17048 read skipped: fuel gauge is unavailable"));
-    }
     return false;
   }
 
@@ -546,9 +539,6 @@ bool Sensors::readStateOfCharge() {
 
   if (!isfinite(percentage)) {
     data.stateOfCharge.valid = false;
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
-      _debugPort->println(F("MAX17048 returned an invalid state-of-charge value"));
-    }
     return false;
   }
 
@@ -563,9 +553,6 @@ bool Sensors::readStateOfCharge() {
 bool Sensors::readEnvironmental() {
   if (!_environmentalReady) {
     data.environmental.valid = false;
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
-      _debugPort->println(F("BME280 read skipped: environmental sensor is unavailable"));
-    }
     return false;
   }
 
@@ -579,9 +566,6 @@ bool Sensors::readEnvironmental() {
 
   if (!readingsValid) {
     data.environmental.valid = false;
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
-      _debugPort->println(F("BME280 returned one or more invalid readings"));
-    }
     return false;
   }
 
@@ -606,7 +590,7 @@ bool Sensors::readSlowSensors(uint16_t gpsMaxWaitMs) {
 
 bool Sensors::sleepIMU() {
   if (!_imuReady) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot sleep BNO08x: IMU is not initialized"));
     }
     return false;
@@ -617,14 +601,14 @@ bool Sensors::sleepIMU() {
   }
 
   if (!_imu.modeSleep()) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("Failed to put BNO08x into sleep mode"));
     }
     return false;
   }
 
   _imuSleeping = true;
-  if (ChipSatDebug::allOnly() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->println(F("BNO08x sleeping"));
   }
   return true;
@@ -632,7 +616,7 @@ bool Sensors::sleepIMU() {
 
 bool Sensors::wakeIMU() {
   if (!_imuReady) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot wake BNO08x: IMU is not initialized"));
     }
     return false;
@@ -643,7 +627,7 @@ bool Sensors::wakeIMU() {
   }
 
   if (!_imu.modeOn()) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("Failed to wake BNO08x"));
     }
     return false;
@@ -656,7 +640,7 @@ bool Sensors::wakeIMU() {
   // Do not assume feature reports survive BNO08x sleep. Reset all report
 
   if (!configureIMUReports(kIMUWakeStartupDelayMs)) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("BNO08x woke, but reports could not be restored"));
     }
     return false;
@@ -666,13 +650,13 @@ bool Sensors::wakeIMU() {
   // accepted. Require one actual NEW event from every enabled report before
   // declaring the IMU ready.
   if (!waitForFreshIMUData(kIMUFreshDataTimeoutMs)) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
       _debugPort->println(F("BNO08x woke, but not every fresh report arrived"));
     }
     return false;
   }
 
-  if (ChipSatDebug::allOnly() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->println(F("BNO08x awake; all fresh reports received"));
   }
   return true;
@@ -681,7 +665,7 @@ bool Sensors::wakeIMU() {
 
 bool Sensors::sleepGPS(uint32_t durationMs) {
   if (!_gpsReady) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot sleep MAX-M10S: GPS is not initialized"));
     }
     return false;
@@ -698,7 +682,7 @@ bool Sensors::sleepGPS(uint32_t durationMs) {
     VAL_RXM_PMREQ_WAKEUPSOURCE_UARTRX);
 
   if (!commandAccepted) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("Failed to put MAX-M10S into software standby"));
     }
     return false;
@@ -709,7 +693,7 @@ bool Sensors::sleepGPS(uint32_t durationMs) {
   delay(50);
   _gpsSleeping = true;
 
-  if (ChipSatDebug::allOnly() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->println(F("MAX-M10S sleeping"));
   }
   return true;
@@ -717,7 +701,7 @@ bool Sensors::sleepGPS(uint32_t durationMs) {
 
 bool Sensors::wakeGPS(uint16_t wakeDelayMs) {
   if (!_gpsReady) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("Cannot wake MAX-M10S: GPS is not initialized"));
     }
     return false;
@@ -742,13 +726,13 @@ bool Sensors::wakeGPS(uint16_t wakeDelayMs) {
   const bool normalModeOkay = configureGPSNormalContinuousMode();
 
   if (!(uartOkay && airborneOkay && normalModeOkay)) {
-    if (ChipSatDebug::errors() && (_debugPort != nullptr)) {
+    if ((DEBUG_PRINT >= 1) && (_debugPort != nullptr)) {
       _debugPort->println(F("MAX-M10S woke, but configuration restore failed"));
     }
     return false;
   }
 
-  if (ChipSatDebug::allOnly() && (_debugPort != nullptr)) {
+  if ((DEBUG_PRINT >= 2) && (_debugPort != nullptr)) {
     _debugPort->println(F("MAX-M10S awake; airborne mode restored"));
   }
   return true;
@@ -758,8 +742,7 @@ bool Sensors::sleepForTransmit() {
   // Sleep GPS first because the power system cannot support GPS and the radio
   // at the same time. Attempt the IMU sleep even if GPS sleep fails so the IMU
   // does not unnecessarily remain at full load.
-  bool gpsOkay = true;
-  // gpsOkay = sleepGPS();
+  const bool gpsOkay = sleepGPS();
   const bool imuOkay = sleepIMU();
   return gpsOkay && imuOkay;
 }
@@ -767,8 +750,7 @@ bool Sensors::sleepForTransmit() {
 bool Sensors::wakeAfterTransmit(uint16_t gpsWakeDelayMs) {
   // Always attempt both wake operations. This also recovers a partial sleep
   // when one sensor entered sleep but the other one failed.
-  bool gpsOkay = true;
-  //bool gpsOkay = wakeGPS(gpsWakeDelayMs);
+  const bool gpsOkay = wakeGPS(gpsWakeDelayMs);
   const bool imuOkay = wakeIMU();
   return gpsOkay && imuOkay;
 }

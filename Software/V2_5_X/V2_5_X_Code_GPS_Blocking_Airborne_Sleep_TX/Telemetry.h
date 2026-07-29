@@ -7,6 +7,8 @@
 namespace ChipSatTelemetry
 {
 
+constexpr uint8_t CHIPSAT_ID = 7;
+
 // Sensor validity bit assignments.
 // Bits 0 through 6 show whether each stored measurement is valid.
 // Bit 7 shows whether every required measurement was freshly collected for
@@ -76,7 +78,6 @@ static_assert(
 void encodePacket(
     const ChipSatSensors::SensorData &source,
     uint16_t packetCounter,
-    uint8_t chipsatID,
     bool allDataFresh,
     TelemetryPacket &destination);
 
@@ -89,12 +90,12 @@ uint16_t calculateCRC16(
 bool packetCRCIsValid(
     const TelemetryPacket &packet);
 
-// Debug utility: print the 55 transmitted bytes in hexadecimal when packet debug is enabled.
+// Debug utility: print the 55 transmitted bytes in hexadecimal.
 void printPacketHex(
     const TelemetryPacket &packet,
     Stream &output);
 
-// Debug utility: print each sensor-validity bit when packet debug is enabled.
+// Debug utility: print each sensor-validity bit in readable form.
 void printSensorValidity(
     uint8_t sensorValidity,
     Stream &output);

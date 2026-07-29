@@ -7,10 +7,8 @@
 #include <RadioLib.h>
 #include "boards.h"
 
-#define hexPrint true
-
-// Serial Detail (false = only packet printed, true = full decoded packet printed)
-#define serialDetail true
+#define hexPrint false
+#define loudSetup false
 
 // -----------------------------------------------------------------------------
 // LoRa settings
@@ -272,15 +270,12 @@ bool decodeTelemetryPacket(
 }
 
 void printRawPacket(const uint8_t* packet, size_t length) {
+  // Line 1: raw packet as uppercase, space-separated hexadecimal bytes.
   if (hexPrint) {
-    Serial.print(F("Raw bytes: "));
-
     for (size_t i = 0; i < length; ++i) {
       if (packet[i] < 0x10) {
         Serial.print('0');
       }
-
-
       Serial.print(packet[i], HEX);
 
       if (i + 1 < length) {
@@ -292,133 +287,97 @@ void printRawPacket(const uint8_t* packet, size_t length) {
   }
 }
 
-void printDecodedTelemetry(
+// Line 2: decoded packet fields in transmitted order, followed by RSSI and SNR.
+//
+// latitude,longitude,gpsAltitude,environmentalAltitude,
+// linearAccelerationX,linearAccelerationY,linearAccelerationZ,
+// gyroscopeX,gyroscopeY,gyroscopeZ,
+// magnetometerX,magnetometerY,magnetometerZ,
+// quaternionI,quaternionJ,quaternionK,quaternionReal,
+// temperature,pressure,humidity,packetCounter,CSID,cellPercentage,
+// sensorValidity,linearAccelerationValid,gyroscopeValid,magnetometerValid,
+// quaternionValid,gpsValid,stateOfChargeValid,environmentalValid,allDataFresh,
+// receivedCRC,RSSI,SNR
+void printCsvTelemetry(
   const DecodedTelemetry& data,
   float rssiDbm,
   float snrDb) {
-  Serial.println(F("\n========== RECEIVED TELEMETRY =========="));
-  Serial.print(F("Packet counter: "));
-  Serial.println(data.packetCounter);
-  Serial.print(F("ChipSat ID (CSID): "));
-  Serial.println(data.CSID);
-
-  Serial.println(F("\nGPS:"));
-  Serial.print(F("  Latitude: "));
   Serial.print(data.latitudeDeg, 7);
-  Serial.println(F(" deg"));
-  Serial.print(F("  Longitude: "));
+  Serial.print(',');
   Serial.print(data.longitudeDeg, 7);
-  Serial.println(F(" deg"));
-  Serial.print(F("  GPS altitude MSL: "));
+  Serial.print(',');
   Serial.print(data.gpsAltitudeM, 3);
-  Serial.println(F(" m"));
-  Serial.print(F("  Environmental altitude: "));
+  Serial.print(',');
   Serial.print(data.environmentalAltitudeM, 2);
-  Serial.println(F(" m"));
+  Serial.print(',');
 
-  Serial.println(F("\nLinear acceleration:"));
-  Serial.print(F("  X: "));
   Serial.print(data.linearAccelerationX, 2);
-  Serial.println(F(" m/s^2"));
-  Serial.print(F("  Y: "));
+  Serial.print(',');
   Serial.print(data.linearAccelerationY, 2);
-  Serial.println(F(" m/s^2"));
-  Serial.print(F("  Z: "));
+  Serial.print(',');
   Serial.print(data.linearAccelerationZ, 2);
-  Serial.println(F(" m/s^2"));
+  Serial.print(',');
 
-  Serial.println(F("\nGyroscope:"));
-  Serial.print(F("  X: "));
   Serial.print(data.gyroscopeX, 1);
-  Serial.println(F(" deg/s"));
-  Serial.print(F("  Y: "));
+  Serial.print(',');
   Serial.print(data.gyroscopeY, 1);
-  Serial.println(F(" deg/s"));
-  Serial.print(F("  Z: "));
+  Serial.print(',');
   Serial.print(data.gyroscopeZ, 1);
-  Serial.println(F(" deg/s"));
+  Serial.print(',');
 
-  Serial.println(F("\nMagnetometer:"));
-  Serial.print(F("  X: "));
   Serial.print(data.magnetometerX, 1);
-  Serial.println(F(" uT"));
-  Serial.print(F("  Y: "));
+  Serial.print(',');
   Serial.print(data.magnetometerY, 1);
-  Serial.println(F(" uT"));
-  Serial.print(F("  Z: "));
+  Serial.print(',');
   Serial.print(data.magnetometerZ, 1);
-  Serial.println(F(" uT"));
+  Serial.print(',');
 
-  Serial.println(F("\nQuaternion:"));
-  Serial.print(F("  I: "));
-  Serial.println(data.quaternionI, 5);
-  Serial.print(F("  J: "));
-  Serial.println(data.quaternionJ, 5);
-  Serial.print(F("  K: "));
-  Serial.println(data.quaternionK, 5);
-  Serial.print(F("  Real: "));
-  Serial.println(data.quaternionReal, 5);
+  Serial.print(data.quaternionI, 5);
+  Serial.print(',');
+  Serial.print(data.quaternionJ, 5);
+  Serial.print(',');
+  Serial.print(data.quaternionK, 5);
+  Serial.print(',');
+  Serial.print(data.quaternionReal, 5);
+  Serial.print(',');
 
-  Serial.println(F("\nEnvironmental:"));
-  Serial.print(F("  Temperature: "));
   Serial.print(data.temperatureC, 2);
-  Serial.println(F(" deg C"));
-  Serial.print(F("  Pressure: "));
+  Serial.print(',');
   Serial.print(data.pressureHpa, 1);
-  Serial.println(F(" hPa"));
-  Serial.print(F("  Humidity: "));
+  Serial.print(',');
   Serial.print(data.humidityPercent, 2);
-  Serial.println(F(" %RH"));
+  Serial.print(',');
 
-  Serial.println(F("\nPower:"));
-  Serial.print(F("  Cell state of charge: "));
+  Serial.print(data.packetCounter);
+  Serial.print(',');
+  Serial.print(data.CSID);
+  Serial.print(',');
   Serial.print(data.cellPercentage, 1);
-  Serial.println(F(" %"));
+  Serial.print(',');
+  Serial.print(data.sensorValidity);
+  Serial.print(',');
+  Serial.print(data.linearAccelerationValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.gyroscopeValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.magnetometerValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.quaternionValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.gpsValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.stateOfChargeValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.environmentalValid ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.allDataFresh ? 1 : 0);
+  Serial.print(',');
+  Serial.print(data.receivedCrc);
+  Serial.print(',');
 
-  Serial.println(F("\nSensor validity:"));
-  Serial.print(F("  Raw bitmask: 0x"));
-  if (data.sensorValidity < 0x10) Serial.print('0');
-  Serial.println(data.sensorValidity, HEX);
-  Serial.print(F("  Linear acceleration valid: "));
-  Serial.println(data.linearAccelerationValid ? F("YES") : F("NO"));
-  Serial.print(F("  Gyroscope valid: "));
-  Serial.println(data.gyroscopeValid ? F("YES") : F("NO"));
-  Serial.print(F("  Magnetometer valid: "));
-  Serial.println(data.magnetometerValid ? F("YES") : F("NO"));
-  Serial.print(F("  Quaternion valid: "));
-  Serial.println(data.quaternionValid ? F("YES") : F("NO"));
-  Serial.print(F("  GPS valid: "));
-  Serial.println(data.gpsValid ? F("YES") : F("NO"));
-  Serial.print(F("  State of charge valid: "));
-  Serial.println(data.stateOfChargeValid ? F("YES") : F("NO"));
-  Serial.print(F("  Environmental valid: "));
-  Serial.println(data.environmentalValid ? F("YES") : F("NO"));
-  Serial.print(F("  All required data fresh this cycle: "));
-  Serial.println(data.allDataFresh ? F("YES") : F("NO"));
-
-  Serial.println(F("\nIntegrity:"));
-  Serial.print(F("  Received CRC: 0x"));
-  if (data.receivedCrc < 0x1000) Serial.print('0');
-  if (data.receivedCrc < 0x0100) Serial.print('0');
-  if (data.receivedCrc < 0x0010) Serial.print('0');
-  Serial.println(data.receivedCrc, HEX);
-  Serial.print(F("  Calculated CRC: 0x"));
-  if (data.calculatedCrc < 0x1000) Serial.print('0');
-  if (data.calculatedCrc < 0x0100) Serial.print('0');
-  if (data.calculatedCrc < 0x0010) Serial.print('0');
-  Serial.println(data.calculatedCrc, HEX);
-  Serial.print(F("  Application CRC: "));
-  Serial.println(
-    data.receivedCrc == data.calculatedCrc ? F("VALID") : F("INVALID"));
-
-  Serial.println(F("\nRadio:"));
-  Serial.print(F("  RSSI: "));
   Serial.print(rssiDbm, 1);
-  Serial.println(F(" dBm"));
-  Serial.print(F("  SNR: "));
-  Serial.print(snrDb, 1);
-  Serial.println(F(" dB"));
-  Serial.println(F("========================================\n"));
+  Serial.print(',');
+  Serial.println(snrDb, 1);
 }
 
 void updateDisplay(
@@ -434,7 +393,9 @@ void updateDisplay(
   char line[32];
 
   u8g2->clearBuffer();
-  u8g2->setFont(u8g2_font_6x12_tf);
+
+  // The 5x8 font allows six readable rows on the T-Beam's 128x64 display.
+  u8g2->setFont(u8g2_font_5x8_tf);
 
   snprintf(
     line,
@@ -443,13 +404,13 @@ void updateDisplay(
     data.CSID,
     data.packetCounter,
     crcValid ? "OK" : "BAD");
-  u8g2->drawStr(0, 11, line);
+  u8g2->drawStr(0, 8, line);
 
   snprintf(line, sizeof(line), "Lat %.5f", data.latitudeDeg);
-  u8g2->drawStr(0, 23, line);
+  u8g2->drawStr(0, 18, line);
 
   snprintf(line, sizeof(line), "Lon %.5f", data.longitudeDeg);
-  u8g2->drawStr(0, 35, line);
+  u8g2->drawStr(0, 28, line);
 
   snprintf(
     line,
@@ -457,10 +418,26 @@ void updateDisplay(
     "T %.1fC  SOC %.1f%%",
     data.temperatureC,
     data.cellPercentage);
-  u8g2->drawStr(0, 47, line);
+  u8g2->drawStr(0, 38, line);
 
   snprintf(line, sizeof(line), "R %.0f  S %.1f", rssiDbm, snrDb);
-  u8g2->drawStr(0, 59, line);
+  u8g2->drawStr(0, 48, line);
+
+  // L=linear acceleration, G=gyroscope, M=magnetometer, Q=quaternion,
+  // P=GPS position, S=state of charge, E=environmental, F=all data fresh.
+  snprintf(
+    line,
+    sizeof(line),
+    "L%d G%d M%d Q%d P%d S%d E%d F%d",
+    data.linearAccelerationValid ? 1 : 0,
+    data.gyroscopeValid ? 1 : 0,
+    data.magnetometerValid ? 1 : 0,
+    data.quaternionValid ? 1 : 0,
+    data.gpsValid ? 1 : 0,
+    data.stateOfChargeValid ? 1 : 0,
+    data.environmentalValid ? 1 : 0,
+    data.allDataFresh ? 1 : 0);
+  u8g2->drawStr(0, 61, line);
 
   u8g2->sendBuffer();
 #else
@@ -473,7 +450,9 @@ void updateDisplay(
 
 void alertFailure(int state, const __FlashStringHelper* operation) {
   if (state == RADIOLIB_ERR_NONE) {
-    Serial.println(F("success!"));
+    if(loudSetup){
+      Serial.println(F("success!"));
+    }
     return;
   }
 
@@ -496,7 +475,9 @@ void alertFailure(int state, const __FlashStringHelper* operation) {
 }
 
 void initRadio() {
-  Serial.print(F("Initializing LoRa radio ... "));
+  if(loudSetup){
+    Serial.print(F("Initializing LoRa radio ... "));
+  }
   int state = radio.begin(
     kFrequencyMHz,
     kBandwidthKHz,
@@ -509,7 +490,9 @@ void initRadio() {
   alertFailure(state, F("radio.begin"));
 
   // LoRa PHY CRC. This is separate from the CRC-16 stored in bytes 53-54.
-  Serial.print(F("Enabling LoRa PHY CRC ... "));
+  if(loudSetup){
+    Serial.print(F("Enabling LoRa PHY CRC ... "));
+  }
   state = radio.setCRC(true);
   alertFailure(state, F("radio.setCRC"));
 }
@@ -524,6 +507,8 @@ void beginListening() {
 }
 
 void setup() {
+  Serial.begin(115200);
+  while(!Serial){};
   initBoard();
 
   // The T-Beam radio power rail needs a brief startup delay.
@@ -532,13 +517,28 @@ void setup() {
   initRadio();
   radio.setPacketReceivedAction(setFlag);
 
-  Serial.print(F("Expected telemetry packet length: "));
-  Serial.print(kTelemetryPacketLength);
-  Serial.println(F(" bytes"));
+  if(loudSetup){
+    Serial.print(F("Expected telemetry packet length: "));
+    Serial.print(kTelemetryPacketLength);
+    Serial.println(F(" bytes"));
+    
 
-  Serial.print(F("Estimated time on air: "));
-  Serial.print(radio.getTimeOnAir(kTelemetryPacketLength));
-  Serial.println(F(" us"));
+    Serial.print(F("Estimated time on air: "));
+    Serial.print(radio.getTimeOnAir(kTelemetryPacketLength));
+    Serial.println(F(" us"));
+  }
+  Serial.println(
+    "Latitude_deg,Longitude_deg,GPS_altitude_MSL_m,Environmental_altitude_m,"
+    "Linear_acceleration_X_m_s2,Linear_acceleration_Y_m_s2,Linear_acceleration_Z_m_s2,"
+    "Gyroscope_X_deg_s,Gyroscope_Y_deg_s,Gyroscope_Z_deg_s,"
+    "Magnetometer_X_uT,Magnetometer_Y_uT,Magnetometer_Z_uT,"
+    "Quaternion_I,Quaternion_J,Quaternion_K,Quaternion_Real,"
+    "Temperature_degC,Pressure_hPa,Humidity_percentRH,"
+    "Packet_counter,CSID,Cell_percentage_percent,Sensor_validity_bitmask,"
+    "Linear_acceleration_valid,Gyroscope_valid,Magnetometer_valid,Quaternion_valid,"
+    "GPS_valid,State_of_charge_valid,Environmental_valid,All_data_fresh,"
+    "Received_CRC16_decimal,RSSI_dBm,SNR_dB"
+  );
 
 #ifdef HAS_DISPLAY
   if (u8g2) {
@@ -579,11 +579,6 @@ void loop() {
     const float rssiDbm = radio.getRSSI();
     const float snrDb = radio.getSNR();
 
-    Serial.print(F("\nReceived "));
-    Serial.print(receivedLength);
-    Serial.println(F(" bytes."));
-    printRawPacket(packet, receivedLength);
-
     if (receivedLength != kTelemetryPacketLength) {
       Serial.print(F("Packet length error: expected "));
       Serial.print(kTelemetryPacketLength);
@@ -597,9 +592,10 @@ void loop() {
         const bool crcValid =
           decoded.receivedCrc == decoded.calculatedCrc;
 
-        if (serialDetail == true) {
-          printDecodedTelemetry(decoded, rssiDbm, snrDb);
-        }
+        // Exactly two serial lines for each successfully received telemetry packet.
+        printRawPacket(packet, receivedLength);
+        printCsvTelemetry(decoded, rssiDbm, snrDb);
+
         updateDisplay(decoded, crcValid, rssiDbm, snrDb);
       }
     }

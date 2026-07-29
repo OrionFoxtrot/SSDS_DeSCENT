@@ -5,8 +5,8 @@
 BNO08x myIMU;
 
 
-#define BNO08X_INT  -1
-#define BNO08X_RST  -1
+#define BNO08X_INT -1
+#define BNO08X_RST -1
 //int pb3, rst pb4
 #define BNO08X_ADDR 0x4A  // Alternate address if ADR jumper is closed
 
@@ -19,21 +19,22 @@ HardwareSerial Print_tx_rx = HardwareSerial(Print_rxPin, Print_txPin);
 void setup() {
   Print_tx_rx.begin(115200);
   pinMode(blinky, OUTPUT);
-  pinMode(BNO08X_INT, INPUT_PULLUP);   // physical pullup already exists
+  pinMode(BNO08X_INT, INPUT_PULLUP);  // physical pullup already exists
   pinMode(BNO08X_RST, OUTPUT);
   digitalWrite(BNO08X_RST, HIGH);
 
-  while (!Print_tx_rx) delay(10);  
-  
+  while (!Print_tx_rx) delay(10);
+
   Print_tx_rx.println();
   Print_tx_rx.println("BNO08x Read Example");
-
+  Wire.setSDA(PA15);
+  Wire.setSCL(PB15);
   Wire.begin();
-  // Wire.setClock(400000);
+
   Wire.flush();
   while (myIMU.begin(BNO08X_ADDR, Wire, -1, -1) == false) {
     Print_tx_rx.println("BNO08x not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
-    delay(2500); // Try to initialize IMU
+    delay(2500);  // Try to initialize IMU
   }
   Print_tx_rx.println("BNO08x found!");
 
@@ -46,7 +47,7 @@ void setup() {
 // Here is where you define the sensor outputs you want to receive
 void setReports(void) {
   Print_tx_rx.println("Setting desired reports");
-  
+
   if (myIMU.enableLinearAccelerometer() == true) {
     Print_tx_rx.println(F("Accelerometer enabled"));
     Print_tx_rx.println(F("Output in form x, y, z, in m/s^2"));
@@ -56,7 +57,7 @@ void setReports(void) {
 }
 
 void loop() {
-  
+
 
   if (myIMU.wasReset()) {
     delay(100);
@@ -81,7 +82,6 @@ void loop() {
     Print_tx_rx.print(z, 2);
 
     Print_tx_rx.println();
-
   }
   delay(10);
   digitalWrite(blinky, LOW);

@@ -1,5 +1,4 @@
 #include "Telemetry.h"
-#include "Debug.h"
 
 #include <math.h>
 #include <limits.h>
@@ -90,7 +89,6 @@ static int32_t scaleToInt32(
 void encodePacket(
   const ChipSatSensors::SensorData &source,
   uint16_t packetCounter,
-  uint8_t chipsatID,
   bool allDataFresh,
   TelemetryPacket &packet) {
   // Clear the entire packet first.
@@ -233,7 +231,7 @@ void encodePacket(
       2.0f);
 
   packet.packetCounter = packetCounter;
-  packet.CSID = chipsatID;
+  packet.CSID = CHIPSAT_ID;
 
   packet.sensorValidity = 0;
 
@@ -306,10 +304,6 @@ bool packetCRCIsValid(
 void printPacketHex(
   const TelemetryPacket &packet,
   Stream &output) {
-  if (!ChipSatDebug::packet()) {
-    return;
-  }
-
   const uint8_t *bytes =
     reinterpret_cast<const uint8_t *>(&packet);
 
@@ -339,10 +333,6 @@ void printPacketHex(
 void printSensorValidity(
   uint8_t sensorValidity,
   Stream &output) {
-  if (!ChipSatDebug::packet()) {
-    return;
-  }
-
   output.print(F("Sensor validity: 0x"));
   if (sensorValidity < 0x10) { output.print('0'); }
   output.println(sensorValidity, HEX);

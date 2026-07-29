@@ -48,6 +48,13 @@
 #endif
 
 
+// debug Level:
+// 0: None
+// 1: Boot Only
+// 2: All
+#ifndef DEBUG_PRINT
+#define DEBUG_PRINT 2
+#endif
 
 namespace ChipSatSensors
 {
@@ -132,9 +139,8 @@ class Sensors
 public:
   explicit Sensors(TwoWire &wirePort = Wire);
 
-  // Initializes all four sensors. debugPort selects the output Stream; the
-  // project-wide category is controlled by ChipSatDebug::level in the main
-  // .ino file. Pass nullptr to suppress every sensor-library message.
+  // Initializes all four sensors. debugPort can point to any working Serial,
+  // HardwareSerial, or SoftwareSerial object. Pass nullptr for no messages.
   // Returns true only if every sensor initializes successfully.
   bool begin(Stream *debugPort = nullptr,
              uint32_t gpsBaud = 9600,

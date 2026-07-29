@@ -39,3 +39,7 @@
 
 # debug information files
 *.dwo
+
+# Ignore specific folders
+GPS_Sleep_Test/
+oldV2_5_X_Code/
