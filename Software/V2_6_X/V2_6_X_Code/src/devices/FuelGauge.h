@@ -9,14 +9,14 @@
 namespace ChipSatDevices
 {
 
-// MAX17048. Adafruit's begin() resets the gauge every boot
+// MAX17048. Which driver is behind this is picked by CHIPSAT_GAUGE_DRIVER in config.h
 class FuelGauge
 {
 public:
   FuelGauge(ChipSatPlatform::I2cBus &bus, ChipSatPlatform::System &system);
 
   ChipSatPlatform::Status begin();
-  ChipSatPlatform::Status read();    // NaN keeps the old value, otherwise clamped to 0-100
+  ChipSatPlatform::Status read();    // clamped to 0-100. A failed read leaves the old value, marked invalid
 
   bool ready() const { return ready_; }
   const ChipSatSensors::StateOfChargeData &data() const { return data_; }
@@ -24,6 +24,9 @@ public:
   float rawPercent() const { return rawPercent_; }   // before the clamp, for logging
 
 private:
+  ChipSatPlatform::Status read16(uint8_t reg, uint16_t &value);
+  ChipSatPlatform::Status write16(uint8_t reg, uint16_t value);
+
   ChipSatPlatform::I2cBus &bus_;
   ChipSatPlatform::System &system_;
   ChipSatSensors::StateOfChargeData data_;

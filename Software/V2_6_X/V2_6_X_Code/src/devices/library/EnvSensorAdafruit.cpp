@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_ENV_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
@@ -13,6 +14,7 @@ namespace ChipSatDevices
 
 using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
+using namespace ChipSatConstants;
 
 static Adafruit_BME280 bme;
 

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../config.h"
+#include "../constants.h"
 #include "Led.h"
 
 namespace ChipSatDevices
@@ -7,18 +8,18 @@ namespace ChipSatDevices
 
 void Led::begin()
 {
-  pinMode(ChipSatConfig::kLedPin, OUTPUT);
-  digitalWrite(ChipSatConfig::kLedPin, ChipSatConfig::kLedLevelAtBoot);
+  pinMode(ChipSatConstants::kLedPin, OUTPUT);
+  digitalWrite(ChipSatConstants::kLedPin, ChipSatConfig::kLedLevelAtBoot);
 }
 
 void Led::transmitStarted()
 {
-  digitalWrite(ChipSatConfig::kLedPin, ChipSatConfig::kLedLevelDuringTx);
+  digitalWrite(ChipSatConstants::kLedPin, ChipSatConfig::kLedLevelDuringTx);
 }
 
 void Led::transmitEnded()
 {
-  digitalWrite(ChipSatConfig::kLedPin, ChipSatConfig::kLedLevelAfterTx);
+  digitalWrite(ChipSatConstants::kLedPin, ChipSatConfig::kLedLevelAfterTx);
 }
 
 } // namespace ChipSatDevices

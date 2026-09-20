@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_RADIO_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
@@ -11,6 +12,7 @@ namespace ChipSatDevices
 
 using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
+using namespace ChipSatConstants;
 
 static STM32WLx lora = new STM32WLx_Module();
 

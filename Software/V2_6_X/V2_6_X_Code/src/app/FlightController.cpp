@@ -3,6 +3,7 @@
 #include "ImuValidity.h"
 #include "TxInterval.h"
 #include "../config.h"
+#include "../constants.h"
 #include "../log/Log.h"
 
 namespace ChipSatApp
@@ -10,6 +11,7 @@ namespace ChipSatApp
 
 using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
+using namespace ChipSatConstants;
 
 [[maybe_unused]] static uint8_t imuValidBits(const ChipSatSensors::IMUData &imu)
 {

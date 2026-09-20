@@ -9,7 +9,8 @@
 namespace ChipSatDevices
 {
 
-// MAX-M10S on LPUART1. Configured once at boot, never put to sleep
+// MAX-M10S on LPUART1. Configured once at boot, never put to sleep.
+// Which driver is behind this is picked by CHIPSAT_GPS_DRIVER in config.h
 class Gps
 {
 public:
@@ -26,12 +27,20 @@ public:
 
   // For logging, from the last read. Calling the library getters again would poll the receiver again
   uint8_t fixType() const { return fixType_; }
+  uint8_t satellites() const { return satellites_; }
   bool llhChecked() const { return llhChecked_; }
   bool invalidLlh() const { return invalidLlh_; }
 
 private:
   bool configureAirborne();
   bool configureNormalContinuous();
+
+  // only the own driver uses these, the library one leaves them undefined
+  void sendUbx(uint8_t cls, uint8_t id, const uint8_t *payload, uint16_t length);
+  bool readUbx(uint32_t deadlineMs);
+  bool waitForUbx(uint8_t cls, uint8_t id, uint16_t maxWaitMs);
+  bool setKey(uint32_t key, uint32_t value, uint8_t valueBytes);
+  void clearStoredPosition();
 
   ChipSatPlatform::Uart &port_;
   ChipSatPlatform::System &system_;
@@ -42,6 +51,7 @@ private:
   bool navOkay_ = false;
   bool modeOkay_ = false;
   uint8_t fixType_ = 0;
+  uint8_t satellites_ = 0;
   bool llhChecked_ = false;
   bool invalidLlh_ = false;
 };

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_UART_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
@@ -9,8 +10,8 @@ namespace ChipSatPlatform
 {
 
 // Constructors only store the pins
-static HardwareSerial consoleSerial(ChipSatConfig::kConsoleRxPin, ChipSatConfig::kConsoleTxPin);
-static HardwareSerial gpsSerial(ChipSatConfig::kGpsRxPin, ChipSatConfig::kGpsTxPin);
+static HardwareSerial consoleSerial(ChipSatConstants::kConsoleRxPin, ChipSatConstants::kConsoleTxPin);
+static HardwareSerial gpsSerial(ChipSatConstants::kGpsRxPin, ChipSatConstants::kGpsTxPin);
 
 static HardwareSerial &serialFor(UartPort port) {
   return port == UartPort::Console ? consoleSerial : gpsSerial;

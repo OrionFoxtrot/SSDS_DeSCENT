@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_IMU_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
@@ -12,6 +13,7 @@ namespace ChipSatDevices
 
 using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
+using namespace ChipSatConstants;
 
 // Only one of these, the library keeps its state in globals
 static BNO08x bno;

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_GPS_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
@@ -12,6 +13,7 @@ namespace ChipSatDevices
 
 using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
+using namespace ChipSatConstants;
 
 static SFE_UBLOX_GNSS gnss;
 
@@ -81,15 +83,15 @@ Status Gps::begin()
 bool Gps::configureNormalContinuous()
 {
   // Also clears any power save mode left over from older firmware
-  rateOkay_ = gnss.setVal16(kUbxCfgRateMeas, kGpsMeasurementIntervalMs, kGpsConfigLayers);
-  navOkay_ = gnss.setVal16(kUbxCfgRateNav, kGpsNavigationRate, kGpsConfigLayers);
-  modeOkay_ = gnss.setVal8(kUbxCfgPmOperateMode, kGpsOperateModeFull, kGpsConfigLayers);
+  rateOkay_ = gnss.setVal16(kUbxCfgRateMeas, kGpsMeasurementIntervalMs, kUbxConfigLayers);
+  navOkay_ = gnss.setVal16(kUbxCfgRateNav, kGpsNavigationRate, kUbxConfigLayers);
+  modeOkay_ = gnss.setVal8(kUbxCfgPmOperateMode, kGpsOperateModeFull, kUbxConfigLayers);
   return rateOkay_ && navOkay_ && modeOkay_;
 }
 
 bool Gps::configureAirborne()
 {
-  return gnss.setVal8(kUbxCfgNavspgDynmodel, kGpsDynamicModel, kGpsConfigLayers);
+  return gnss.setVal8(kUbxCfgNavspgDynmodel, kGpsDynamicModel, kUbxConfigLayers);
 }
 
 Status Gps::read(uint16_t maxWaitMs)
