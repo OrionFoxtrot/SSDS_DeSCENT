@@ -26,7 +26,7 @@
 #define CHIPSAT_GPS_DRIVER    CHIPSAT_DRIVER_OWN      // ours, or SparkFun u-blox GNSS 2.2.28
 #endif
 #ifndef CHIPSAT_ENV_DRIVER
-#define CHIPSAT_ENV_DRIVER    CHIPSAT_DRIVER_LIBRARY  // Adafruit BME280 2.3.0
+#define CHIPSAT_ENV_DRIVER    CHIPSAT_DRIVER_OWN  // Adafruit BME280 2.3.0
 #endif
 #ifndef CHIPSAT_GAUGE_DRIVER
 #define CHIPSAT_GAUGE_DRIVER  CHIPSAT_DRIVER_OWN      // ours, or Adafruit MAX1704X 1.0.3
@@ -101,8 +101,16 @@ constexpr uint8_t  kGpsMinSatellites = 4;
 constexpr bool     kGpsClearStoredPosition = false;
 constexpr uint16_t kGpsResetSettleMs = 500;   // how long the receiver gets to restart afterwards
 
-// BME280
-constexpr float kSeaLevelPressureHpa = 1013.25f;   // altitude is measured against this
+// BME28 on demand 16x oversampling on all three, which takes about 98 ms and is why the timeout is 200
+constexpr uint8_t  kEnvOversampling = 0x05;   // 0 off, 1 x1, 2 x2, 3 x4, 4 x8, 5 x16
+constexpr uint16_t kEnvMeasureTimeoutMs = 200;
+constexpr uint16_t kEnvMeasurePollMs = 5;
+constexpr uint16_t kEnvCalibrationWaitMs = 50;   // the chip copies its calibration out after a reset
+constexpr uint16_t kEnvResetSettleMs = 10;
+
+// Altitude is measured against this. 1013.25 hPa is the standard atmosphere, which is what to use
+// unless someone can set the day's actual sea level pressure before launch
+constexpr float kSeaLevelPressureHpa = 1013.25f;
 
 // Radio
 constexpr float    kRadioFrequencyMhz = 915.0f;

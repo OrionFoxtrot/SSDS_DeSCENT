@@ -35,6 +35,27 @@ constexpr uint16_t kGaugeVersionMask = 0xFFF0;
 constexpr uint16_t kGaugeVersionValue = 0x0010;
 constexpr uint8_t kGaugeStatusResetIndicator = 0x01;   // high byte, set once after a real power-up
 
+// BME280 registers
+constexpr uint8_t kEnvRegCalib1 = 0x88;     // 26 bytes, temperature and pressure constants plus H1
+constexpr uint8_t kEnvRegCalib2 = 0xE1;     // 7 bytes, the humidity constants
+constexpr uint8_t kEnvRegChipId = 0xD0;
+constexpr uint8_t kEnvRegReset = 0xE0;
+constexpr uint8_t kEnvRegStatus = 0xF3;
+constexpr uint8_t kEnvRegCtrlHum = 0xF2;
+constexpr uint8_t kEnvRegCtrlMeas = 0xF4;
+constexpr uint8_t kEnvRegConfig = 0xF5;
+constexpr uint8_t kEnvRegData = 0xF7;       // 8 bytes: pressure, temperature, humidity
+constexpr uint8_t kEnvCalib1Length = 26;
+constexpr uint8_t kEnvCalib2Length = 7;
+constexpr uint8_t kEnvDataLength = 8;
+constexpr uint8_t kEnvChipIdValue = 0x60;
+constexpr uint8_t kEnvResetCommand = 0xB6;
+constexpr uint8_t kEnvStatusImUpdate = 0x01;   // bit 0, copying calibration out of its own memory
+constexpr uint8_t kEnvStatusMeasuring = 0x08;  // bit 3, a conversion is running
+constexpr uint8_t kEnvModeSleep = 0x00;
+constexpr uint8_t kEnvModeForced = 0x01;
+constexpr uint8_t kEnvFilterOff = 0x00;
+
 // UBX framing: B5 62, class, id, length (little endian), payload, two checksum bytes
 constexpr uint8_t kUbxSync1 = 0xB5;
 constexpr uint8_t kUbxSync2 = 0x62;
