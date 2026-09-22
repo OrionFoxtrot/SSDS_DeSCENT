@@ -15,9 +15,8 @@ using ChipSatPlatform::Status;
 using namespace ChipSatConfig;
 using namespace ChipSatConstants;
 
-// Bosch's compensation maths, BME280 datasheet section 4.2.3. Raw readings mean nothing without it:
-// every chip carries its own calibration constants and these formulas turn counts into real units.
-// Copied from the datasheet, same as the Adafruit driver had them, minus its temperature offset
+// Bosch's compensation maths, BME280 datasheet 4.2.3, the same as the Adafruit driver had them minus
+// its temperature offset
 
 // The 18 factory constants, read out of the chip at boot
 struct Bme280Calibration
@@ -169,52 +168,67 @@ Status EnvSensor::waitForStatus(uint8_t mask, uint16_t timeoutMs)
   }
 }
 
+// One try: chip id, reset, calibration, settings. True when the chip is ready to measure
+bool EnvSensor::start()
+{
+  lastStartMs_ = system_.nowMs();
+
+  uint8_t chipId = 0;
+  if (readRegisters(kEnvRegChipId, &chipId, 1) != Status::Ok || chipId != kEnvChipIdValue ||
+      writeRegister(kEnvRegReset, kEnvResetCommand) != Status::Ok) {
+    return false;
+  }
+  system_.waitMs(kEnvResetSettleMs);
+
+  // The chip copies its calibration out of its own memory after a reset
+  uint8_t calib1[kEnvCalib1Length] = {0};
+  uint8_t calib2[kEnvCalib2Length] = {0};
+  const bool ready = waitForStatus(kEnvStatusImUpdate, kEnvCalibrationWaitMs) == Status::Ok &&
+                     readRegisters(kEnvRegCalib1, calib1, sizeof calib1) == Status::Ok &&
+                     readRegisters(kEnvRegCalib2, calib2, sizeof calib2) == Status::Ok;
+
+  // Humidity oversampling only takes effect on the next write to ctrl_meas, so it goes first
+  const bool configured = ready &&
+                          writeRegister(kEnvRegCtrlHum, kEnvOversampling) == Status::Ok &&
+                          writeRegister(kEnvRegConfig, kEnvFilterOff) == Status::Ok &&
+                          writeRegister(kEnvRegCtrlMeas, measControl(kEnvModeSleep)) == Status::Ok;
+  if (!configured) {
+    return false;
+  }
+  parseCalibration(calib1, calib2, calibration);
+  ready_ = true;
+  measuring_ = false;
+  return true;
+}
+
+// One try only, read() tries again every kEnvRetryMs
 Status EnvSensor::begin()
 {
   LOG_I(Env, "start");
   const uint32_t startMs = system_.nowMs();
 
-  for (uint8_t attempt = 0; attempt < kInitAttempts; ++attempt) {
-    uint8_t chipId = 0;
-    if (readRegisters(kEnvRegChipId, &chipId, 1) == Status::Ok && chipId == kEnvChipIdValue &&
-        writeRegister(kEnvRegReset, kEnvResetCommand) == Status::Ok) {
-      system_.waitMs(kEnvResetSettleMs);
-
-      // The chip copies its calibration out of its own memory after a reset
-      uint8_t calib1[kEnvCalib1Length] = {0};
-      uint8_t calib2[kEnvCalib2Length] = {0};
-      const bool ready = waitForStatus(kEnvStatusImUpdate, kEnvCalibrationWaitMs) == Status::Ok &&
-                         readRegisters(kEnvRegCalib1, calib1, sizeof calib1) == Status::Ok &&
-                         readRegisters(kEnvRegCalib2, calib2, sizeof calib2) == Status::Ok;
-
-      // Humidity oversampling only takes effect on the next write to ctrl_meas, so it goes first
-      const bool configured = ready &&
-                              writeRegister(kEnvRegCtrlHum, kEnvOversampling) == Status::Ok &&
-                              writeRegister(kEnvRegConfig, kEnvFilterOff) == Status::Ok &&
-                              writeRegister(kEnvRegCtrlMeas, measControl(kEnvModeSleep)) == Status::Ok;
-
-      if (configured) {
-        parseCalibration(calib1, calib2, calibration);
-        ready_ = true;
-        LOG_I(Env, "init") {
-          line.field("ok", true);
-          line.field("attempts", attempt + 1);
-          line.field("ms", system_.nowMs() - startMs);
-        }
-        return Status::Ok;
-      }
+  if (start()) {
+    LOG_I(Env, "init") {
+      line.field("ok", true);
+      line.field("ms", system_.nowMs() - startMs);
     }
-
-    system_.waitMs(kInitRetryDelayMs);
+    return Status::Ok;
   }
 
-  ready_ = false;
   LOG_E(Env, "init") {
     line.field("ok", false);
-    line.field("attempts", kInitAttempts);
-    line.field("retry", "never");
+    line.field("retryms", kEnvRetryMs);
   }
   return Status::NoAck;
+}
+
+// Longest a forced measurement can take, datasheet appendix B:
+// 1.25 + 2.3 T + (2.3 P + 0.575) + (2.3 H + 0.575) ms, T P H being the oversampling counts
+static uint16_t measureTimeMs()
+{
+  const uint32_t samples = kEnvOversampling == 0 ? 0 : 1UL << (kEnvOversampling - 1);
+  const uint32_t us = 1250 + 3 * 2300 * samples + 2 * 575;
+  return static_cast<uint16_t>((us + 999) / 1000);
 }
 
 uint8_t EnvSensor::measControl(uint8_t mode)
@@ -222,8 +236,31 @@ uint8_t EnvSensor::measControl(uint8_t mode)
   return static_cast<uint8_t>(kEnvOversampling << 5 | kEnvOversampling << 2 | mode);
 }
 
+// Forced mode: one measurement on demand, then the sensor goes back to sleep by itself
+Status EnvSensor::startMeasurement()
+{
+  if (!ready_) {
+    return Status::NotReady;
+  }
+  // ctrl_hum every time too, a chip that reset mid-flight has lost it
+  Status status = writeRegister(kEnvRegCtrlHum, kEnvOversampling);
+  if (status == Status::Ok) {
+    status = writeRegister(kEnvRegCtrlMeas, measControl(kEnvModeForced));
+  }
+  measuring_ = status == Status::Ok;
+  measureStartMs_ = system_.nowMs();
+  return status;
+}
+
 Status EnvSensor::read()
 {
+  // An absent chip only costs one unanswered address here
+  if (!ready_ && system_.nowMs() - lastStartMs_ >= kEnvRetryMs && start()) {
+    LOG_I(Env, "init") {
+      line.field("ok", true);
+      line.field("retry", true);
+    }
+  }
   if (!ready_) {
     data_.valid = false;
     LOG_W(Env, "refused") {
@@ -233,11 +270,17 @@ Status EnvSensor::read()
     return Status::NotReady;
   }
 
-  // Forced mode: one measurement on demand, then the sensor goes back to sleep by itself
-  Status status = writeRegister(kEnvRegCtrlMeas, measControl(kEnvModeForced));
+  // The measuring bit isn't set straight after the command, checking it early reads the old result.
+  // Wait out the rest of the worst case first
+  Status status = measuring_ ? Status::Ok : startMeasurement();
   if (status == Status::Ok) {
+    const uint32_t elapsedMs = system_.nowMs() - measureStartMs_;
+    if (elapsedMs < measureTimeMs()) {
+      system_.waitMs(measureTimeMs() - elapsedMs);
+    }
     status = waitForStatus(kEnvStatusMeasuring, kEnvMeasureTimeoutMs);
   }
+  measuring_ = false;
 
   uint8_t raw[kEnvDataLength] = {0};
   if (status == Status::Ok) {
@@ -258,11 +301,45 @@ Status EnvSensor::read()
   const int32_t adcT = static_cast<int32_t>(raw[3]) << 12 | static_cast<int32_t>(raw[4]) << 4 | raw[5] >> 4;
   const int32_t adcH = static_cast<int32_t>(raw[6]) << 8 | raw[7];
 
+  // What a skipped channel reads (datasheet 5.4.3, 5.4.5), e.g. after a reset nobody noticed
+  if (adcP == 0x80000 || adcT == 0x80000 || adcH == 0x8000) {
+    data_.valid = false;
+    LOG_W(Env, "read") {
+      line.field("ok", false);
+      line.field("reason", "skipped");
+    }
+    return Status::BadData;
+  }
+
   const int32_t tFine = temperatureFine(calibration, adcT);
-  data_.temperatureC = temperature(tFine);
-  data_.pressurePa = pressure(calibration, adcP, tFine);
-  data_.humidityPercent = humidity(calibration, adcH, tFine);
-  data_.altitudeM = altitude(data_.pressurePa, kSeaLevelPressureHpa);
+  const float temperatureC = temperature(tFine);
+  const float pressurePa = pressure(calibration, adcP, tFine);
+  const float humidityPercent = humidity(calibration, adcH, tFine);
+  const float altitudeM = altitude(pressurePa, kSeaLevelPressureHpa);
+
+  // Bad calibration still reads as a good transfer, e.g. 0xFF from a chip that let go mid-read, and
+  // gives 0 Pa or worse. Anything outside what the chip can measure keeps the old values, marked invalid
+  const bool sane = isfinite(temperatureC) && isfinite(pressurePa) && isfinite(humidityPercent) &&
+                    isfinite(altitudeM) &&
+                    pressurePa >= kEnvMinPressurePa && pressurePa <= kEnvMaxPressurePa &&
+                    temperatureC >= kEnvMinTemperatureC && temperatureC <= kEnvMaxTemperatureC &&
+                    humidityPercent >= kEnvMinHumidityPercent && humidityPercent <= kEnvMaxHumidityPercent;
+  if (!sane) {
+    data_.valid = false;
+    LOG_W(Env, "read") {
+      line.field("ok", false);
+      line.field("reason", "range");
+      line.field("temp", temperatureC, 2);
+      line.field("pa", pressurePa, 0);
+      line.field("rh", humidityPercent, 2);
+    }
+    return Status::BadData;
+  }
+
+  data_.temperatureC = temperatureC;
+  data_.pressurePa = pressurePa;
+  data_.humidityPercent = humidityPercent;
+  data_.altitudeM = altitudeM;
   data_.updatedMs = system_.nowMs();
   data_.valid = true;
   return Status::Ok;

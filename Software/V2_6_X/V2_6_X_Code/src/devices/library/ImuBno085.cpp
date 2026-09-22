@@ -148,6 +148,13 @@ Status Imu::begin(uint16_t reportIntervalMs)
   return Status::NoAck;
 }
 
+// The library retries a failed I2C write forever (shtp.c:309-314), so every call that can write
+// checks the IMU still answers first. Narrows the window, doesn't close it
+static bool answers(ChipSatPlatform::I2cBus &bus)
+{
+  return bus.probe(kImuAddress) == Status::Ok;
+}
+
 void Imu::service()
 {
   if (!sleeping_) {
@@ -254,7 +261,7 @@ Status Imu::waitForFresh(uint16_t timeoutMs)
 
   missing_ = kImuAllReports & ~freshReports;
   LOG_W(Imu, "timeout") {
-    line.field("limitms", timeoutMs);   // 500 = cycle read, 3000 = after wake
+    line.field("limitms", timeoutMs);   // the cycle read or the wait after a wake
     line.key("missing");
     writeReportNames(line, missing_);
   }
@@ -263,7 +270,7 @@ Status Imu::waitForFresh(uint16_t timeoutMs)
 
 bool Imu::update()
 {
-  if (!ready_ || sleeping_) {
+  if (!ready_ || sleeping_ || !answers(bus_)) {
     return false;
   }
 
@@ -363,6 +370,13 @@ Status Imu::sleep()
   }
 
   LOG_D(Imu, "sleep") { line.field("step", "start"); }
+  if (!answers(bus_)) {
+    LOG_W(Imu, "sleep") {
+      line.field("ok", false);
+      line.field("step", "probe");
+    }
+    return Status::Failed;
+  }
   if (!bno.modeSleep()) {
     LOG_W(Imu, "sleep") { line.field("ok", false); }
     return Status::Failed;
@@ -393,6 +407,13 @@ Status Imu::wake()
 
   const uint32_t startMs = system_.nowMs();
   LOG_D(Imu, "wake") { line.field("step", "start"); }
+  if (!answers(bus_)) {
+    LOG_W(Imu, "wake") {
+      line.field("ok", false);
+      line.field("step", "probe");
+    }
+    return Status::Failed;   // still flagged asleep, tried again next cycle
+  }
   if (!bno.modeOn()) {
     LOG_W(Imu, "wake") {
       line.field("ok", false);
@@ -438,6 +459,10 @@ Status Imu::resetHub()
 
   // softReset() only sends the command (sh2_devReset -> shtp_send), it doesn't wait for a reply.
   // update() turns the reports back on once the IMU says it has reset
+  if (!answers(bus_)) {
+    LOG_W(Imu, "softreset") { line.field("ok", false); }
+    return Status::Failed;
+  }
   const bool ok = bno.softReset();
   system_.waitMs(kImuSoftResetSettleMs);
 

@@ -47,7 +47,6 @@ Status FuelGauge::begin()
     line.field("ok", false);
     line.field("attempts", kInitAttempts);
     line.field("retry", "never");
-    line.field("nexts", kFirstTxIntervalMs / 1000);   // no battery reading ever, so the interval stays at 5 s
   }
   return Status::NoAck;
 }

@@ -51,6 +51,12 @@ Status EnvSensor::begin()
   return Status::NoAck;
 }
 
+// library runs the chip in normal mode
+Status EnvSensor::startMeasurement()
+{
+  return ready_ ? Status::Ok : Status::NotReady;
+}
+
 Status EnvSensor::read()
 {
   if (!ready_) {

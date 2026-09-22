@@ -3,7 +3,8 @@
 namespace ChipSatApp
 {
 
-uint32_t txIntervalFromSoc(float socPercent) {
+uint32_t txIntervalFromSoc(float socPercent)
+{
   if (socPercent > 75.0f) {
     return 10UL * 1000UL;
   } else if (socPercent >= 50.0f) {

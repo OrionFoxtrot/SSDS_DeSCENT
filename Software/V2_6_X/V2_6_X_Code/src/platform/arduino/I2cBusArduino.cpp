@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "../../config.h"
+#include "../../constants.h"
 
 #if CHIPSAT_I2C_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
 #include "../I2cBus.h"
+#include "../../log/Log.h"
 
 namespace ChipSatPlatform
 {
@@ -21,8 +23,33 @@ static Status fromEndTransmission(uint8_t code)
   }
 }
 
+static uint32_t sda = 0;
+static uint32_t scl = 0;
+static uint8_t stuck = 0;   // timeouts in a row
+
+// A part that resets mid-read can hold SDA low, then every transfer times out after 100 ms for the
+// rest of the flight. Wire only frees the bus (9 clocks and a stop) in begin(), so start it again
+static Status watch(Status status)
+{
+  if (status != Status::Timeout && status != Status::BusError) {
+    stuck = 0;
+    return status;
+  }
+  if (++stuck >= ChipSatConstants::kI2cStuckTransfers) {
+    stuck = 0;
+    Wire.end();
+    Wire.setSDA(sda);
+    Wire.setSCL(scl);
+    Wire.begin();
+    LOG_W(Cyc, "i2crecover");
+  }
+  return status;
+}
+
 Status I2cBus::begin(uint32_t sdaPin, uint32_t sclPin)
 {
+  sda = sdaPin;
+  scl = sclPin;
   // Pins before begin(), otherwise Wire grabs PA9 (the LED)
   Wire.setSDA(sdaPin);
   Wire.setSCL(sclPin);
@@ -34,7 +61,7 @@ Status I2cBus::begin(uint32_t sdaPin, uint32_t sclPin)
 Status I2cBus::probe(uint8_t address)
 {
   Wire.beginTransmission(address);
-  return fromEndTransmission(Wire.endTransmission());
+  return watch(fromEndTransmission(Wire.endTransmission()));
 }
 
 Status I2cBus::write(uint8_t address, const uint8_t *data, size_t length)
@@ -44,7 +71,7 @@ Status I2cBus::write(uint8_t address, const uint8_t *data, size_t length)
     Wire.endTransmission();
     return Status::BusError;
   }
-  return fromEndTransmission(Wire.endTransmission());
+  return watch(fromEndTransmission(Wire.endTransmission()));
 }
 
 Status I2cBus::read(uint8_t address, uint8_t *buffer, size_t length)
@@ -66,7 +93,7 @@ Status I2cBus::writeThenRead(uint8_t address, const uint8_t *txData, size_t txLe
 {
   Wire.beginTransmission(address);
   Wire.write(txData, txLength);
-  const Status sent = fromEndTransmission(Wire.endTransmission(false));
+  const Status sent = watch(fromEndTransmission(Wire.endTransmission(false)));
   if (sent != Status::Ok) {
     return sent;
   }

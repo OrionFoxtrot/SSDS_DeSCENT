@@ -23,7 +23,7 @@ struct Quaternionf
 
 struct IMUData
 {
-  // Matches the supplied IMU test: gravity is removed by the BNO08x.
+  // Gravity already taken out by the BNO085
   Vector3f linearAccelerationMps2;
   Vector3f gyroscopeRadPerSec;
   Vector3f magnetometerMicroTesla;
@@ -43,9 +43,7 @@ struct IMUData
 
 struct GPSData
 {
-  // Native SparkFun u-blox units:
-  // latitude / longitude: degrees multiplied by 10^7
-  // altitude MSL: millimeters
+  // NAV-PVT's own units: degrees x 10^7, altitude above sea level in mm
   int32_t latitudeE7 = 0;
   int32_t longitudeE7 = 0;
   int32_t altitudeMSLmm = 0;

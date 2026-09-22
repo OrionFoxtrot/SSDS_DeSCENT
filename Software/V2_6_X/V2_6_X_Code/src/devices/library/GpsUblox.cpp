@@ -51,7 +51,7 @@ Status Gps::begin()
           line.field("ms", system_.nowMs() - startMs);
         }
       } else {
-        // No retry, setup halts on this
+        // No retry, read() refuses from here on so the GPS goes out invalid
         LOG_E(Gps, "init") {
           line.field("ok", false);
           line.field("reason", "config");
@@ -94,8 +94,14 @@ bool Gps::configureAirborne()
   return gnss.setVal8(kUbxCfgNavspgDynmodel, kGpsDynamicModel, kUbxConfigLayers);
 }
 
-Status Gps::read(uint16_t maxWaitMs)
+// library polls in read()
+void Gps::service()
 {
+}
+
+Status Gps::read()
+{
+  const uint16_t maxWaitMs = kGpsPvtWaitMs;
   if (!ready_) {
     return Status::NotReady;
   }
@@ -119,7 +125,8 @@ Status Gps::read(uint16_t maxWaitMs)
   data_.altitudeMSLmm = gnss.getAltitudeMSL();
   data_.updatedMs = system_.nowMs();
 
-  // Airborne models don't do 2D fixes ("No 2D position fixes supported", DYN_MODEL_AIRBORNE4g in the u-blox library header)
+  // Airborne models don't do 2D fixes ("No 2D position fixes supported", DYN_MODEL_AIRBORNE4g in the
+  // u-blox library header)
   fixType_ = gnss.getFixType();
   if (fixType_ >= 3) {
     invalidLlh_ = gnss.getInvalidLlh();

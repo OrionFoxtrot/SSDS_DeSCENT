@@ -47,6 +47,11 @@ static Status fromCode(int16_t code)
   return Status::Failed;
 }
 
+Radio::Radio(ChipSatPlatform::System &system)
+  : system_(system)
+{
+}
+
 Status Radio::begin()
 {
   lora.setRfSwitchTable(rfswitchPins, rfswitchTable);
@@ -85,10 +90,33 @@ Status Radio::applyPaConfig()
   return fromCode(lastCode_);
 }
 
-Status Radio::transmit(const uint8_t *data, size_t length)
+// Same steps as RadioLib's own transmit() (SX126x.cpp:195), minus its wait loop
+Status Radio::startTransmit(const uint8_t *data, size_t length)
 {
-  lastCode_ = lora.transmit(data, length);
+  lastCode_ = lora.standby();
+  if (lastCode_ != RADIOLIB_ERR_NONE) {
+    return fromCode(lastCode_);
+  }
+  lastCode_ = lora.startTransmit(data, length);
   return fromCode(lastCode_);
+}
+
+// The interrupt line, like RadioLib's own loop. Reading the flags over SPI instead can give 0xFFFF
+// from a dead radio, which would look done
+bool Radio::transmitDone()
+{
+  return SubGhz.isInterruptPending();
+}
+
+Status Radio::finishTransmit()
+{
+  lastCode_ = lora.finishTransmit();
+  return fromCode(lastCode_);
+}
+
+uint32_t Radio::timeOnAirMs(size_t length)
+{
+  return static_cast<uint32_t>(lora.getTimeOnAir(length) / 1000);
 }
 
 } // namespace ChipSatDevices

@@ -36,7 +36,7 @@ public:
   void field(const char *key, unsigned long value);
   void field(const char *key, const char *word);
   void field(const char *key, float value, uint8_t decimals);
-  void fieldFixed(const char *key, int32_t scaled, uint8_t decimals);   // e.g. 424433500 with 7 decimals prints 42.4433500
+  void fieldFixed(const char *key, int32_t scaled, uint8_t decimals);   // 424433500, 7 decimals -> 42.4433500
   void fieldHex(const char *key, uint32_t value, uint8_t digits);
   void fieldBits(const char *key, uint8_t bits, uint8_t count);         // bit 0 printed first
   void fieldList(const char *key, const uint32_t *values, uint8_t count);

@@ -30,7 +30,7 @@ FlightController::FlightController(ChipSatPlatform::System &system,
                                    ChipSatDevices::Radio &radio,
                                    ChipSatDevices::Led &led)
   : system_(system), i2c_(i2c), console_(console), gpsPort_(gpsPort), imu_(imu), gps_(gps), env_(env),
-    gauge_(gauge), radio_(radio), led_(led), txIntervalMs_(kFirstTxIntervalMs)
+    gauge_(gauge), radio_(radio), led_(led), txIntervalMs_(kTxIntervalMs)
 {
 }
 
@@ -43,16 +43,14 @@ void FlightController::setup()
 
   LOG_BOOT(Boot, "start") { line.field("log", CHIPSAT_LOG_LEVEL); }
   logResetCause();
+  system_.startWatchdog(kWatchdogTimeoutMs);
+
+  // Radio before the sensors, so a sensor that hangs at boot still leaves one packet on air.
+  // Never halts, a missing sensor just goes out invalid
+  radioReady_ = configRadio();
+  sendStatusPacket();
 
   beginSensors();
-
-  // GPS setup failed, don't start the radio. Not having a fix is fine
-  if (!gps_.ready()) {
-    LOG_E(Boot, "halt") { line.field("reason", "gps"); }
-    system_.haltForever(kGpsHaltPollMs);
-  }
-
-  configRadio();
 
   LOG_BOOT(Boot, "setup") {
     line.field("done", true);
@@ -74,7 +72,6 @@ void FlightController::logResetCause()
     line.field("pin", cause.pin);
     line.field("obl", cause.optionByteLoad);
     line.field("rfilar", cause.radioIllegalAccess);
-    line.field("rf", cause.radio);
   }
 }
 
@@ -84,22 +81,42 @@ void FlightController::beginSensors()
   gpsPort_.begin(kGpsBaud);   // before the IMU
 
   imu_.begin(kImuReportIntervalMs);
+  keepAlive();
   gps_.begin();
+  keepAlive();
   gauge_.begin();
+  keepAlive();
   env_.begin();
 }
 
-void FlightController::configRadio()
+// Whatever is known so far, all fresh bits clear
+void FlightController::sendStatusPacket()
+{
+  ChipSatTelemetry::encodePacket(data_, packetCounter_, kChipSatId, false, packet_);
+  packetCounter_++;
+  LOG_PACKET(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
+  transmit();
+}
+
+// A slow sensor start after a reboot mid-flight shouldn't leave the air quiet
+void FlightController::keepAlive()
+{
+  if (system_.nowMs() - lastTxMs_ >= kBootKeepAliveMs) {
+    sendStatusPacket();
+  }
+}
+
+bool FlightController::configRadio()
 {
   LOG_I(Radio, "start");
   Status status = radio_.begin();
   LOG_D(Radio, "ldro") { line.field("code", radio_.ldroCode()); }
   if (status != Status::Ok) {
-    LOG_E(Boot, "halt") {
+    LOG_E(Radio, "failed") {
       line.field("reason", "radiobegin");
       line.field("code", radio_.lastCode());
     }
-    system_.haltForever(kRadioHaltPollMs);
+    return false;
   }
   LOG_I(Radio, "init") {
     line.field("ok", true);
@@ -108,46 +125,46 @@ void FlightController::configRadio()
 
   status = radio_.setCurrentLimit();
   if (status != Status::Ok) {
-    LOG_E(Boot, "halt") {
+    LOG_E(Radio, "failed") {
       line.field("reason", "radioocp");
       line.field("code", radio_.lastCode());
     }
-    system_.haltForever(kRadioHaltPollMs);
+    return false;
   }
-  // SPI read, only compiled in with this log line
-  LOG_I(Radio, "ocp") { line.field("ma", radio_.currentLimitMa(), 2); }
-
   status = radio_.setOutputPower();
   if (status != Status::Ok) {
-    LOG_E(Boot, "halt") {
+    LOG_E(Radio, "failed") {
       line.field("reason", "radiopower");
       line.field("code", radio_.lastCode());
     }
-    system_.haltForever(kRadioHaltPollMs);
+    return false;
   }
-  LOG_I(Radio, "power") {
-    line.field("ok", true);
-    line.field("dbm", kRadioPowerDbm);
-  }
+  LOG_I(Radio, "power") { line.field("ok", true); }
 
   status = radio_.applyPaConfig();
   if (status != Status::Ok) {
-    LOG_E(Boot, "halt") {
+    LOG_E(Radio, "failed") {
       line.field("reason", "radiopa");
       line.field("code", radio_.lastCode());
     }
-    system_.haltForever(kRadioHaltPollMs);
+    return false;
   }
   LOG_I(Radio, "pa") {
     line.field("ok", true);
     line.field("module", kRadioModuleName);
+    line.field("dbm", kPaPowerDbm);   // what SetTxParams gets, the PA row decides the real output
     line.field("code", radio_.lastCode());
   }
+  // SPI read, only compiled in with this log line. After the PA step, which resets it
+  LOG_I(Radio, "ocp") { line.field("ma", radio_.currentLimitMa(), 2); }
+  return true;
 }
 
 void FlightController::loop()
 {
+  system_.feedWatchdog();
   imu_.service();
+  gps_.service();
 
   if (system_.nowMs() - previousReadMs_ >= txIntervalMs_) {
     runCycle();
@@ -161,10 +178,11 @@ void FlightController::runCycle()
 
   CycleReads reads;
   reads.gateMs = system_.nowMs();
+  env_.startMeasurement();   // converts while the other reads run
   const Status imuRead = imu_.waitForFresh(kImuFreshWaitCycleMs);
   reads.imuOkay = imuRead == Status::Ok;
   const uint32_t imuDoneMs = system_.nowMs();
-  reads.gpsOkay = gps_.read(kGpsPvtWaitMs) == Status::Ok;
+  reads.gpsOkay = gps_.read() == Status::Ok;
   const uint32_t gpsDoneMs = system_.nowMs();
   reads.socOkay = gauge_.read() == Status::Ok;
   const uint32_t socDoneMs = system_.nowMs();
@@ -176,12 +194,14 @@ void FlightController::runCycle()
   reads.socMs = socDoneMs - gpsDoneMs;
   reads.envMs = envDoneMs - socDoneMs;
 
-  const bool allDataFresh = reads.imuOkay && reads.gpsOkay && reads.socOkay && reads.envOkay;
-
   data_.imu = imu_.data();
   data_.gps = gps_.data();
   data_.stateOfCharge = gauge_.data();
   data_.environmental = env_.data();
+
+  // A GPS frame taken in during the env wait can clear valid after read() said Ok
+  reads.gpsOkay = reads.gpsOkay && data_.gps.valid;
+  const bool allDataFresh = reads.imuOkay && reads.gpsOkay && reads.socOkay && reads.envOkay;
 
   // Don't send frozen IMU values as valid. Only the packet copy changes
   const uint8_t staleReports = clearStaleImuReports(data_.imu, system_.nowMs(), kImuStaleMs);
@@ -190,12 +210,14 @@ void FlightController::runCycle()
   }
 
   logReads(reads);
+  system_.waitMs(0);   // the console blocks while its buffer drains, read the GPS port
 
   const uint16_t counterUsed = packetCounter_;
   ChipSatTelemetry::encodePacket(data_, packetCounter_, kChipSatId, allDataFresh, packet_);
   packetCounter_++;
 
   LOG_PACKET(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
+  system_.waitMs(0);
   LOG_I(Cyc, "packet") {
     line.field("ctr", counterUsed);
     line.fieldHex("valid", packet_.sensorValidity, 2);
@@ -205,15 +227,15 @@ void FlightController::runCycle()
     line.field("imusleep", imu_.sleeping());
   }
 
-  // Only the IMU sleeps, never the GPS
-  if (imu_.sleep() == Status::Ok) {
-    transmit();
-  } else {
-    LOG_W(Tx, "skipped") { line.field("reason", "imusleep"); }
+  // HP module only, the IMU sleeps for the transmission. The packet goes out either way
+  const bool imuSleeps = kImuSleepsDuringTx && imu_.ready();
+  if (imuSleeps) {
+    imu_.sleep();
   }
-
-  // Every cycle, TX or not
-  imu_.wake();
+  transmit();
+  if (imuSleeps) {
+    imu_.wake();
+  }
 
   // Soft reset the IMU if a report stays silent for a few cycles
   const uint8_t silent = silentImuReports(imu_.eventCounts(), imuCountsLastCycle_);
@@ -238,29 +260,57 @@ void FlightController::runCycle()
     imuStuckCycles_ = 0;
   }
 
-  if (reads.socOkay) {
-    txIntervalMs_ = txIntervalFromSoc(data_.stateOfCharge.cellPercentage);
-  }
+  const bool fromBattery = kTxFromBattery && reads.socOkay;
+  txIntervalMs_ = fromBattery ? txIntervalFromSoc(data_.stateOfCharge.cellPercentage) : kTxIntervalMs;
 
   previousReadMs_ = system_.nowMs();
 
   LOG_I(Cyc, "end") {
-    line.field("nexts", txIntervalMs_ / 1000UL);
-    line.field("socok", reads.socOkay);
-    line.field("kept", !reads.socOkay);
+    line.field("nextms", txIntervalMs_);
+    line.field("battery", fromBattery);
     line.field("durms", previousReadMs_ - reads.gateMs);
   }
 }
 
 void FlightController::transmit()
 {
+  bool freshSetup = false;
+  if (!radioReady_) {
+    freshSetup = true;
+    radioReady_ = configRadio();
+    if (!radioReady_) {
+      LOG_E(Tx, "skipped") { line.field("reason", "radio"); }
+      return;
+    }
+  }
+
   LOG_D(Tx, "send") { line.field("step", "start"); }
 
   const uint32_t startMs = system_.nowMs();
   led_.transmitStarted();
-  const Status status = radio_.transmit(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
+  Status status = radio_.startTransmit(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
+  if (status != Status::Ok && !freshSetup) {
+    // a radio that reset itself fails here. Set it up again and try once more, so it costs no packet
+    radioReady_ = configRadio();
+    if (radioReady_) {
+      status = radio_.startTransmit(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
+    }
+  }
+  if (status == Status::Ok) {
+    // time on air is exact, 100 ms covers TCXO start and ramp. waitMs keeps the GPS port read meanwhile
+    const uint32_t timeoutMs = radio_.timeOnAirMs(sizeof(packet_)) + 100;
+    while (!radio_.transmitDone() && system_.nowMs() - startMs <= timeoutMs) {
+      system_.waitMs(1);
+    }
+    const bool done = radio_.transmitDone();
+    status = radio_.finishTransmit();
+    if (!done) {
+      status = Status::Timeout;
+    }
+  }
   led_.transmitEnded();
-  const uint32_t txMs = system_.nowMs() - startMs;
+  lastTxMs_ = system_.nowMs();
+  const uint32_t txMs = lastTxMs_ - startMs;
 
   if (status == Status::Ok) {
     LOG_I(Tx, "done") {
@@ -269,6 +319,7 @@ void FlightController::transmit()
       line.field("ms", txMs);
     }
   } else {
+    radioReady_ = false;   // set the radio up again before the next packet
     LOG_E(Tx, "done") {
       line.field("ok", false);
       line.field("code", radio_.lastCode());

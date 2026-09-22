@@ -36,51 +36,55 @@ Status FuelGauge::write16(uint8_t reg, uint16_t value)
   return bus_.write(kGaugeAddress, tx, sizeof tx);
 }
 
+// One try. True when the gauge answered with the right version
+bool FuelGauge::start()
+{
+  lastStartMs_ = system_.nowMs();
+
+  uint16_t version = 0;
+  if (bus_.probe(kGaugeAddress) != Status::Ok || read16(kGaugeRegVersion, version) != Status::Ok ||
+      (version & kGaugeVersionMask) != kGaugeVersionValue) {
+    return false;
+  }
+  ready_ = true;
+
+  // The gauge tracks the cell over time. A power-up reading is taken under whatever load we are
+  // drawing, so only clear the flag on a real power-up and leave a warm reboot's estimate alone
+  uint16_t status = 0;
+  const bool statusOk = read16(kGaugeRegStatus, status) == Status::Ok;
+  const bool poweredUp = statusOk && ((status >> 8) & kGaugeStatusResetIndicator) != 0;
+  if (poweredUp) {
+    write16(kGaugeRegStatus, status & ~(static_cast<uint16_t>(kGaugeStatusResetIndicator) << 8));
+  }
+
+  LOG_I(Soc, "init") {
+    line.field("ok", true);
+    line.fieldHex("ver", version, 4);
+    line.field("powerup", poweredUp);
+  }
+  return true;
+}
+
+// One try only, read() tries again every kGaugeRetryMs
 Status FuelGauge::begin()
 {
   LOG_I(Soc, "start");
-  const uint32_t startMs = system_.nowMs();
-
-  for (uint8_t attempt = 0; attempt < kInitAttempts; ++attempt) {
-    uint16_t version = 0;
-    if (bus_.probe(kGaugeAddress) == Status::Ok && read16(kGaugeRegVersion, version) == Status::Ok &&
-        (version & kGaugeVersionMask) == kGaugeVersionValue) {
-      ready_ = true;
-
-      // The gauge tracks the cell over time. A power-up reading is taken under whatever load we are
-      // drawing, so only clear the flag on a real power-up and leave a warm reboot's estimate alone
-      uint16_t status = 0;
-      const bool statusOk = read16(kGaugeRegStatus, status) == Status::Ok;
-      const bool poweredUp = statusOk && ((status >> 8) & kGaugeStatusResetIndicator) != 0;
-      if (poweredUp) {
-        write16(kGaugeRegStatus, status & ~(static_cast<uint16_t>(kGaugeStatusResetIndicator) << 8));
-      }
-
-      LOG_I(Soc, "init") {
-        line.field("ok", true);
-        line.field("attempts", attempt + 1);
-        line.fieldHex("ver", version, 4);
-        line.field("powerup", poweredUp);
-        line.field("ms", system_.nowMs() - startMs);
-      }
-      return Status::Ok;
-    }
-
-    system_.waitMs(kInitRetryDelayMs);
+  if (start()) {
+    return Status::Ok;
   }
-
-  ready_ = false;
   LOG_E(Soc, "init") {
     line.field("ok", false);
-    line.field("attempts", kInitAttempts);
-    line.field("retry", "never");
-    line.field("nexts", kFirstTxIntervalMs / 1000);   // no battery reading ever, so the interval stays at 5 s
+    line.field("retryms", kGaugeRetryMs);
   }
   return Status::NoAck;
 }
 
 Status FuelGauge::read()
 {
+  // An absent gauge only costs one unanswered address here
+  if (!ready_ && system_.nowMs() - lastStartMs_ >= kGaugeRetryMs) {
+    start();
+  }
   if (!ready_) {
     data_.valid = false;
     LOG_W(Soc, "refused") {

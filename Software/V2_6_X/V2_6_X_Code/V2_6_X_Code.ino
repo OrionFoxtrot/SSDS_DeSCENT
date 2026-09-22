@@ -22,14 +22,20 @@ ChipSatDevices::Imu imu(i2cBus, chipSystem);
 ChipSatDevices::Gps gps(gpsPort, chipSystem);
 ChipSatDevices::EnvSensor envSensor(i2cBus, chipSystem);
 ChipSatDevices::FuelGauge fuelGauge(i2cBus, chipSystem);
-ChipSatDevices::Radio radio;
+ChipSatDevices::Radio radio(chipSystem);
 ChipSatDevices::Led led;
 
 ChipSatApp::FlightController flight(chipSystem, i2cBus, consolePort, gpsPort,
                                     imu, gps, envSensor, fuelGauge, radio, led);
 
+void serviceGps()
+{
+  gps.service();
+}
+
 void setup()
 {
+  chipSystem.onWait(serviceGps);
   flight.setup();
 }
 

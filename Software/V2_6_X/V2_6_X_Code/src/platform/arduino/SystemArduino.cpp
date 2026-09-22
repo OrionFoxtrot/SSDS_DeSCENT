@@ -3,6 +3,7 @@
 
 #if CHIPSAT_SYSTEM_DRIVER == CHIPSAT_DRIVER_LIBRARY
 
+#include <IWatchdog.h>
 #include "../System.h"
 
 namespace ChipSatPlatform
@@ -15,7 +16,23 @@ uint32_t System::nowMs() const
 
 void System::waitMs(uint32_t ms) const
 {
-  delay(ms);
+  const uint32_t startMs = millis();
+  do {
+    IWatchdog.reload();
+    if (idle_ != nullptr) {
+      idle_();
+    }
+  } while (millis() - startMs < ms);
+}
+
+void System::startWatchdog(uint32_t timeoutMs)
+{
+  IWatchdog.begin(timeoutMs * 1000UL);
+}
+
+void System::feedWatchdog() const
+{
+  IWatchdog.reload();
 }
 
 ResetCause System::readAndClearResetCause()
@@ -30,17 +47,9 @@ ResetCause System::readAndClearResetCause()
   cause.pin = (cause.csr & RCC_CSR_PINRSTF) != 0;
   cause.optionByteLoad = (cause.csr & RCC_CSR_OBLRSTF) != 0;
   cause.radioIllegalAccess = (cause.csr & RCC_CSR_RFILARSTF) != 0;
-  cause.radio = (cause.csr & RCC_CSR_RFRSTF) != 0;
 
   __HAL_RCC_CLEAR_RESET_FLAGS();
   return cause;
-}
-
-void System::haltForever(uint32_t pollMs)
-{
-  while (true) {
-    delay(pollMs);
-  }
 }
 
 } // namespace ChipSatPlatform

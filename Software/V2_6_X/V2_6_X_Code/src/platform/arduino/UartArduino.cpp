@@ -13,11 +13,14 @@ namespace ChipSatPlatform
 static HardwareSerial consoleSerial(ChipSatConstants::kConsoleRxPin, ChipSatConstants::kConsoleTxPin);
 static HardwareSerial gpsSerial(ChipSatConstants::kGpsRxPin, ChipSatConstants::kGpsTxPin);
 
-static HardwareSerial &serialFor(UartPort port) {
+static HardwareSerial &serialFor(UartPort port)
+{
   return port == UartPort::Console ? consoleSerial : gpsSerial;
 }
 
-Uart::Uart(UartPort port) : port_(port) {}
+Uart::Uart(UartPort port) : port_(port)
+{
+}
 
 Status Uart::begin(uint32_t baud)
 {
@@ -29,7 +32,6 @@ size_t Uart::write(const uint8_t *data, size_t length)
 {
   return serialFor(port_).write(data, length);
 }
-
 
 size_t Uart::write(const char *text)
 {

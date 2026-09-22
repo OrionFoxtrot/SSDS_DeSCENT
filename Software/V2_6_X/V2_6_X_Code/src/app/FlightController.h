@@ -50,7 +50,9 @@ private:
 
   void logResetCause();
   void beginSensors();
-  void configRadio();   // halts on any failure
+  void sendStatusPacket();
+  void keepAlive();
+  bool configRadio();   // false if any step failed
   void runCycle();
   void transmit();
   void logReads(const CycleReads &reads) const;
@@ -70,8 +72,10 @@ private:
   ChipSatTelemetry::TelemetryPacket packet_{};
   uint16_t packetCounter_ = 0;
   uint32_t previousReadMs_ = 0;
-  uint32_t txIntervalMs_;   // 5000 until the first good battery reading
+  uint32_t txIntervalMs_;
   uint32_t cycle_ = 0;   // for logging
+  bool radioReady_ = false;
+  uint32_t lastTxMs_ = 0;
 
   // IMU stuck check
   uint32_t imuCountsLastCycle_[4] = {0, 0, 0, 0};
