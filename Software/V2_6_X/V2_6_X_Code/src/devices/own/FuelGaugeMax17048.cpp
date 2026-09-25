@@ -82,7 +82,8 @@ Status FuelGauge::begin()
 Status FuelGauge::read()
 {
   // An absent gauge only costs one unanswered address here
-  if (!ready_ && system_.nowMs() - lastStartMs_ >= kGaugeRetryMs) {
+  const uint32_t nowMs = system_.nowMs();
+  if (!ready_ && nowMs - lastStartMs_ >= sensorRetryMs(nowMs, kGaugeRetryMs)) {
     start();
   }
   if (!ready_) {

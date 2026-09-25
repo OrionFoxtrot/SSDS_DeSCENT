@@ -14,7 +14,7 @@
 namespace ChipSatLog
 {
 
-enum class Tag : uint8_t { Boot, Rst, Imu, Gps, Soc, Env, Radio, Tx, Cyc, Pkt };
+enum class Tag : uint8_t { Boot, Rst, Imu, Gps, Soc, Env, Radio, Tx, Cyc, Pkt, Flash };
 
 void begin(ChipSatPlatform::Uart &console, const ChipSatPlatform::System &system);
 void setCycle(uint32_t cycle);

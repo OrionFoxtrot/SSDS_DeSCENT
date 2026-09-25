@@ -33,6 +33,7 @@ static uint16_t framesIn = 0;
 static uint16_t badSums = 0;
 static uint16_t notUbx = 0;       // NMEA, if it's still on
 static uint16_t mostQueued = 0;   // 63 means the port's 64 byte buffer filled up
+static uint32_t frameStartMs = 0;   // when the frame being read now started arriving
 
 // True when this byte completes a frame with a good checksum, the frame is then in frame[]
 static bool feedUbx(uint8_t byte)
@@ -328,7 +329,13 @@ void Gps::service()
   int next;
   while ((next = port_.read()) >= 0) {
     ++bytesIn;
-    if (feedUbx(static_cast<uint8_t>(next)) && frameClass == kUbxClassNav && frameId == kUbxIdNavPvt &&
+    const bool wasIdle = step == Step::Sync1;
+    const bool complete = feedUbx(static_cast<uint8_t>(next));
+    if (wasIdle && step == Step::Sync2) {
+      // the time in the frame belongs to this moment, not to when the last byte turns up 100 ms later
+      frameStartMs = system_.nowMs();
+    }
+    if (complete && frameClass == kUbxClassNav && frameId == kUbxIdNavPvt &&
         framePayloadLength == kNavPvtLength) {
       takePvt();
     }
@@ -371,6 +378,52 @@ void Gps::takePvt()
     data_.updatedMs = lastPvtMs_;
   }
   data_.valid = trustworthy;
+
+  takeUtc();
+}
+
+// Days since 1970 for a civil date, Howard Hinnant's days_from_civil
+static int32_t daysFromCivil(int32_t y, uint32_t m, uint32_t d)
+{
+  y -= m <= 2;
+  const int32_t era = (y >= 0 ? y : y - 399) / 400;
+  const uint32_t yoe = static_cast<uint32_t>(y - era * 400);
+  const uint32_t doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  const uint32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + static_cast<int32_t>(doe) - 719468;
+}
+
+// UTC out of the same frame. The receiver knows the time before it knows where it is, but it also
+// reports a plausible looking date before that time is any good, so wait for its own fully resolved bit
+void Gps::takeUtc()
+{
+  const uint8_t valid = frame[kNavPvtValid];
+  utcBits_ = valid;
+  const bool resolved = (valid & (kNavPvtValidDate | kNavPvtValidTime | kNavPvtFullyResolved)) ==
+                        (kNavPvtValidDate | kNavPvtValidTime | kNavPvtFullyResolved);
+  if (!resolved) {
+    utcValid_ = false;
+    return;
+  }
+
+  const uint16_t year = static_cast<uint16_t>(frame[kNavPvtYear] | frame[kNavPvtYear + 1] << 8);
+  const uint8_t month = frame[kNavPvtMonth];
+  const uint8_t day = frame[kNavPvtDay];
+  const uint8_t hour = frame[kNavPvtHour];
+  const uint8_t minute = frame[kNavPvtMinute];
+  const uint8_t second = frame[kNavPvtSecond];
+  if (year < 2020 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour > 23 || minute > 59 || second > 60) {
+    utcValid_ = false;
+    return;
+  }
+
+  const int32_t days = daysFromCivil(year, month, day);
+  utcEpoch_ = static_cast<uint32_t>(days) * 86400UL + hour * 3600UL + minute * 60UL + second;
+  utcNano_ = readS32(&frame[kNavPvtNano]);
+  utcAccNs_ = static_cast<uint32_t>(readS32(&frame[kNavPvtTimeAcc]));
+  utcUptimeMs_ = frameStartMs;
+  utcValid_ = true;
 }
 
 // Never waits

@@ -12,6 +12,9 @@ From V2_6_X, with only CMake installed:
 ./build.sh flash
 ./build.sh probes             # lists the ST-Links plugged in
 ./build.sh flash --probe SN   # when more than one is
+
+./build.sh flash --sketch flash_dump    # a bench sketch instead of the flight software
+./build.sh flash                        # and back to the flight software
 ```
 The first run downloads everything into V2_6_X/deps, pinned and checked by sha256: the Arduino STM32
 core 2.12.0 and CMSIS sources, the compiler, ninja and OpenOCD. Deleting deps/ and build/ is always safe

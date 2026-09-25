@@ -16,16 +16,20 @@ set(BUILD "${ROOT}/build")
 # arguments after the script name
 set(ACTION build)
 set(PROBE "")
+set(SKETCH_NAME "")
 set(i 3)
 while(i LESS CMAKE_ARGC)
   set(arg "${CMAKE_ARGV${i}}")
   if(arg STREQUAL "--probe")
     math(EXPR i "${i} + 1")
     set(PROBE "${CMAKE_ARGV${i}}")
-  elseif(arg MATCHES "^(build|setup|flash|probes|clean|help)$")
+  elseif(arg STREQUAL "--sketch")
+    math(EXPR i "${i} + 1")
+    set(SKETCH_NAME "${CMAKE_ARGV${i}}")
+  elseif(arg MATCHES "^(build|setup|flash|reset|ground|probes|clean|help)$")
     set(ACTION "${arg}")
   elseif(NOT arg STREQUAL "--")
-    message(FATAL_ERROR "unknown argument ${arg}, try: build, setup, flash [--probe SN], probes, clean")
+    message(FATAL_ERROR "unknown argument ${arg}, try: build, setup, flash [--probe SN] [--sketch NAME], probes, clean")
   endif()
   math(EXPR i "${i} + 1")
 endwhile()
@@ -34,8 +38,13 @@ if(ACTION STREQUAL "help")
   message("build              fetch what's missing, configure, build")
   message("setup              fetch everything, flashing tool too, and configure. Nothing is built")
   message("flash [--probe SN] build, then flash with the ST-Link (the one with serial SN if there are several)")
+  message("reset [--probe SN] restart the board over the ST-Link, without building or flashing")
+  message("ground             download the ground software, for replaying logs")
   message("probes             list the ST-Links plugged in")
   message("clean              delete build/")
+  message("")
+  message("--sketch NAME      build a bench sketch from V2_6_X_Tests/bench instead of the flight software,")
+  message("                   e.g. ./build.sh flash --sketch flash_dump. Leave it off to go back to flight")
   return()
 endif()
 
@@ -68,6 +77,11 @@ set(CMSIS_VERSION 6.2.0)
 set(CMSIS_URL https://github.com/stm32duino/ArduinoModule-CMSIS/releases/download/${CMSIS_VERSION}/CMSIS-${CMSIS_VERSION}.tar.bz2)
 set(CMSIS_SHA e9dcf458a333cda8d4332bb3a4058e8c3de1626c4a567250c60151b590a1d8ce)
 
+# The ground software, one bare executable per platform. Published by the descent-ground repo, hashes
+# from its v0.4.5 release. Not every platform has a build, and the ones that do are named for it
+set(GROUND_VERSION 0.4.5)
+set(GROUND_URL https://github.com/ThePrivatePanda/descent-ground/releases/download/v${GROUND_VERSION})
+
 set(GCC_VERSION 14.2.1-1.1)
 set(OPENOCD_VERSION 0.12.0-7)
 set(NINJA_VERSION 1.13.2)
@@ -83,6 +97,8 @@ if(HOST_OS STREQUAL "Linux" AND HOST_CPU STREQUAL "x64")
   set(OPENOCD_SHA 94b3790983beaf8ed57e646c0620dd66d705fddae03d290823a6ed3b439468d6)
   set(NINJA_FILE ninja-linux.zip)
   set(NINJA_SHA 5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6)
+  set(GROUND_ASSET descent-ground-linux-x64)
+  set(GROUND_SHA 7569e0537e15b7e10b73789e992815383f1b0f966c907dada89e2e6d13038f9d)
 elseif(HOST_OS STREQUAL "Linux" AND HOST_CPU STREQUAL "arm64")
   set(TAG linux-arm64)
   set(EXT tar.gz)
@@ -104,6 +120,8 @@ elseif(HOST_OS STREQUAL "macOS" AND HOST_CPU STREQUAL "arm64")
   set(OPENOCD_SHA 667342c086984f3e5a55b4e0d5f711add13fb04de040fca493303000e6c19327)
   set(NINJA_FILE ninja-mac.zip)   # universal binary
   set(NINJA_SHA c99048673aa765960a99cf10c6ddb9f1fad506099ff0a0e137ad8960a88f321b)
+  set(GROUND_ASSET descent-ground-macos-arm64)
+  set(GROUND_SHA c343492b7e78e0198cbe871a26903c737162d4fa1a5c38d8d6ee51daa28fc66b)
 elseif(HOST_OS STREQUAL "Windows" AND HOST_CPU STREQUAL "x64")
   set(TAG win32-x64)
   set(EXT zip)
@@ -111,6 +129,8 @@ elseif(HOST_OS STREQUAL "Windows" AND HOST_CPU STREQUAL "x64")
   set(OPENOCD_SHA 6bfd3c97135aafef8affc9af1acf34fd0e2b9ca26044506f6abd7f95b7630052)
   set(NINJA_FILE ninja-win.zip)
   set(NINJA_SHA 07fc8261b42b20e71d1720b39068c2e14ffcee6396b76fb7a795fb460b78dc65)
+  set(GROUND_ASSET descent-ground-windows-x64.exe)
+  set(GROUND_SHA d7c1dd5cd4a7cb21cfa4d7665d88d945f3b7769b7ca51cc1b87daa11c0263b38)
 else()
   message(FATAL_ERROR "no prebuilt compiler for ${HOST_OS} on ${HOST_CPU}")
 endif()
@@ -158,10 +178,69 @@ function(fetch name url sha)
   file(WRITE "${dest}/.ok" "${sha}")
 endfunction()
 
+# The ground software is a bare executable, so there's nothing to unpack: download it, check the hash,
+# make it runnable. The hash pins the artefact and the tag pins the version, which matters because a
+# GitHub release asset can be replaced in place
+function(fetch_exe name asset url sha)
+  set(dest "${DEPS}/${name}")
+  if(EXISTS "${dest}/.ok")
+    file(READ "${dest}/.ok" have)
+    if(have STREQUAL "${sha}")
+      return()
+    endif()
+  endif()
+  message("fetching ${asset}")
+  file(DOWNLOAD "${url}" "${dest}/${asset}" EXPECTED_HASH SHA256=${sha} SHOW_PROGRESS STATUS status TLS_VERIFY ON)
+  list(GET status 0 code)
+  if(NOT code EQUAL 0)
+    file(REMOVE "${dest}/${asset}")
+    message(FATAL_ERROR "download of ${url} failed: ${status}")
+  endif()
+  file(CHMOD "${dest}/${asset}" PERMISSIONS
+       OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  if(APPLE)
+    # downloaded binaries are quarantined and macOS refuses to run them. Not tested by anyone: the
+    # ground software has never been run on a Mac, and neither has this build
+    execute_process(COMMAND xattr -d com.apple.quarantine "${dest}/${asset}" ERROR_QUIET)
+  endif()
+  file(WRITE "${dest}/.ok" "${sha}")
+endfunction()
+
 file(MAKE_DIRECTORY "${DEPS}")
 
 # ---------------------------------------------------------------------------------------------------
 # probes: list the ST-Links (USB vendor 0483) with the tools each OS already has
+
+# Undoes the UTF-8 the kernel wrapped the raw serial bytes in: c2 XX is XX, c3 XX is XX plus 0x40.
+# Everything else is already the byte it looks like. Trailing newline dropped
+function(probe_serial_hex bytes out)
+  string(LENGTH "${bytes}" length)
+  set(text "")
+  set(i 0)
+  while(i LESS length)
+    string(SUBSTRING "${bytes}" ${i} 2 pair)
+    math(EXPR value "0x${pair}")
+    math(EXPR i "${i} + 2")
+    if((value EQUAL 194 OR value EQUAL 195) AND i LESS length)
+      string(SUBSTRING "${bytes}" ${i} 2 second)
+      math(EXPR low "0x${second}")
+      math(EXPR i "${i} + 2")
+      math(EXPR value "${low} + (${value} - 194) * 64")
+    endif()
+    if(NOT value EQUAL 10)
+      string(TOUPPER "${pair}" pair)
+      math(EXPR value "${value}" OUTPUT_FORMAT HEXADECIMAL)
+      string(SUBSTRING "${value}" 2 -1 value)
+      string(TOUPPER "${value}" value)
+      string(LENGTH "${value}" width)
+      if(width EQUAL 1)
+        set(value "0${value}")
+      endif()
+      string(APPEND text "${value}")
+    endif()
+  endwhile()
+  set(${out} "${text}" PARENT_SCOPE)
+endfunction()
 
 if(ACTION STREQUAL "probes")
   set(found "")
@@ -177,6 +256,13 @@ if(ACTION STREQUAL "probes")
         if(EXISTS "${dev}/serial")
           file(READ "${dev}/serial" serial)
           string(STRIP "${serial}" serial)
+          # an ST-Link V2's serial is 12 raw bytes, not text. The kernel hands them over as UTF-8, so
+          # they come out as mojibake and OpenOCD won't match them. It wants the hex, which is also
+          # what STM32CubeProgrammer shows
+          if(NOT serial MATCHES "^[A-Za-z0-9]*$")
+            file(READ "${dev}/serial" bytes HEX)
+            probe_serial_hex("${bytes}" serial)
+          endif()
         endif()
         if(EXISTS "${dev}/product")
           file(READ "${dev}/product" product)
@@ -219,7 +305,7 @@ endif()
 # only the parts of the core this chip uses, the rest is every other STM32 family (645 MB, and paths too
 # long for Windows)
 fetch(STM32-${CORE_VERSION} "${CORE_URL}" ${CORE_SHA}
-  "*/cores/arduino/*" "*/libraries/SrcWrapper/*" "*/libraries/Wire/*" "*/libraries/IWatchdog/*"
+  "*/cores/arduino/*" "*/libraries/SrcWrapper/*" "*/libraries/Wire/*" "*/libraries/IWatchdog/*" "*/libraries/SPI/*"
   "*/variants/STM32WLxx/WL54JCI_WL55JCI_WLE4J(8-B-C)I_WLE5J(8-B-C)I/*"
   "*/system/Drivers/STM32WLxx_HAL_Driver/*" "*/system/Drivers/CMSIS/Device/ST/STM32WLxx/*"
   "*/system/STM32WLxx/*" "*/system/ldscript.ld" "*/License.md")
@@ -231,19 +317,74 @@ if(NOT HOST_OS STREQUAL "Windows")
   file(CHMOD "${NINJA}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endif()
 
-if(NOT EXISTS "${BUILD}/build.ninja")
+if(ACTION STREQUAL "ground")
+  if(NOT GROUND_ASSET)
+    message(FATAL_ERROR "the ground software has no build for ${HOST_OS} on ${HOST_CPU}")
+  endif()
+  fetch_exe(descent-ground-${GROUND_VERSION} "${GROUND_ASSET}" "${GROUND_URL}/${GROUND_ASSET}" ${GROUND_SHA})
+  message("ground software in ${DEPS}/descent-ground-${GROUND_VERSION}")
+  return()
+endif()
+
+if(ACTION STREQUAL "reset")
+  # Restarts the board so bench/flash_dump prints its log from the first record. Nothing is built:
+  # the console only has to be listened to, and a reset is the one trigger that can't be missed
+  fetch(xpack-openocd-${OPENOCD_VERSION} "${OPENOCD_URL}/xpack-openocd-${OPENOCD_VERSION}-${TAG}.${EXT}" ${OPENOCD_SHA})
+  set(OPENOCD_DIR "${DEPS}/xpack-openocd-${OPENOCD_VERSION}")
+  set(select "")
+  if(PROBE)
+    set(select -c "adapter serial ${PROBE}")
+  endif()
+  execute_process(COMMAND "${OPENOCD_DIR}/bin/openocd${EXE}"
+                          -s "${OPENOCD_DIR}/openocd/scripts"
+                          -f interface/stlink.cfg ${select}
+                          -f target/stm32wlx.cfg
+                          -c "init; reset run; exit"
+                  RESULT_VARIABLE rc)
+  if(NOT rc EQUAL 0)
+    message(FATAL_ERROR "reset failed. Is the ST-Link plugged in and the board powered?")
+  endif()
+  message("reset")
+  return()
+endif()
+
+set(BENCH "${ROOT}/V2_6_X_Tests/bench")
+set(SKETCH_INO "")
+if(SKETCH_NAME)
+  set(SKETCH_INO "${BENCH}/${SKETCH_NAME}/${SKETCH_NAME}.ino")
+  if(NOT EXISTS "${SKETCH_INO}")
+    file(GLOB found RELATIVE "${BENCH}" "${BENCH}/*")
+    list(JOIN found ", " found)
+    message(FATAL_ERROR "no bench sketch called ${SKETCH_NAME}. There is: ${found}")
+  endif()
+endif()
+
+# one build/ for everything: the core objects don't depend on which sketch is on top, so swapping
+# between the flight software and a bench sketch only rebuilds the sketch. The stamp says what's in there
+set(stamp "")
+if(EXISTS "${BUILD}/sketch.txt")
+  file(READ "${BUILD}/sketch.txt" stamp)
+endif()
+if(NOT EXISTS "${BUILD}/build.ninja" OR NOT stamp STREQUAL "${SKETCH_INO}")
   execute_process(COMMAND "${CMAKE_COMMAND}" -S "${ROOT}" -B "${BUILD}" -G Ninja
                           "-DCMAKE_MAKE_PROGRAM=${NINJA}"
                           "-DCMAKE_TOOLCHAIN_FILE=${ROOT}/cmake/arm-none-eabi.cmake"
+                          "-DCHIPSAT_SKETCH=${SKETCH_INO}"
                   RESULT_VARIABLE rc)
   if(NOT rc EQUAL 0)
     message(FATAL_ERROR "configure failed")
   endif()
+  file(WRITE "${BUILD}/sketch.txt" "${SKETCH_INO}")
 endif()
 
 if(ACTION STREQUAL "setup")
   fetch(xpack-openocd-${OPENOCD_VERSION} "${OPENOCD_URL}/xpack-openocd-${OPENOCD_VERSION}-${TAG}.${EXT}" ${OPENOCD_SHA})
-  message("ready, deps/ has the compiler, ninja and openocd")
+  if(GROUND_ASSET)
+    fetch_exe(descent-ground-${GROUND_VERSION} "${GROUND_ASSET}" "${GROUND_URL}/${GROUND_ASSET}" ${GROUND_SHA})
+  else()
+    message("no ground software build for ${HOST_OS} on ${HOST_CPU}, skipping it")
+  endif()
+  message("ready, deps/ has the compiler, ninja, openocd and the ground software")
   return()
 endif()
 
@@ -255,7 +396,11 @@ execute_process(COMMAND "${CMAKE_COMMAND}" --build "${BUILD}" ${jobs} RESULT_VAR
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "build failed")
 endif()
-message("built ${BUILD}/chipsat.elf")
+if(SKETCH_NAME)
+  message("built ${BUILD}/chipsat.elf, which is the ${SKETCH_NAME} bench sketch, not the flight software")
+else()
+  message("built ${BUILD}/chipsat.elf, the flight software")
+endif()
 
 if(NOT ACTION STREQUAL "flash")
   return()

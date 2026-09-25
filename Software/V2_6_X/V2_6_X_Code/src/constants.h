@@ -139,6 +139,18 @@ constexpr uint32_t kGpsBaud = 9600;   // the receiver's factory setting, we neve
 
 // NAV-PVT payload is 92 bytes. The fields we read, by offset
 constexpr uint16_t kNavPvtLength = 92;
+constexpr uint8_t kNavPvtYear = 4;      // UTC, then month, day, hour, minute, second
+constexpr uint8_t kNavPvtMonth = 6;
+constexpr uint8_t kNavPvtDay = 7;
+constexpr uint8_t kNavPvtHour = 8;
+constexpr uint8_t kNavPvtMinute = 9;
+constexpr uint8_t kNavPvtSecond = 10;
+constexpr uint8_t kNavPvtValid = 11;    // bit 0 date, bit 1 time, bit 2 fully resolved
+constexpr uint8_t kNavPvtValidDate = 0x01;
+constexpr uint8_t kNavPvtValidTime = 0x02;
+constexpr uint8_t kNavPvtFullyResolved = 0x04;
+constexpr uint8_t kNavPvtTimeAcc = 12;  // uint32, the receiver's estimate of its time error, ns
+constexpr uint8_t kNavPvtNano = 16;     // int32, the fraction of the second, ns
 constexpr uint8_t kNavPvtFixType = 20;
 constexpr uint8_t kNavPvtFlags = 21;
 constexpr uint8_t kNavPvtNumSatellites = 23;
@@ -213,18 +225,53 @@ constexpr uint8_t  kPaDeviceSel = 0x01;   // low power PA
 constexpr uint8_t  kPaHpMax = 0x00;
 constexpr uint8_t  kPaLut = 0x01;
 #elif CHIPSAT_RADIO_MODULE == CHIPSAT_RADIO_MODULE_HP
-// HP module, SX1262 +17 dBm row, SetTxParams +22 (hence kPaPowerDbm). Not RadioLib's 0x04 / 0x07
-// row for 22 dBm. Draws a lot more current than LE
+// HP module, SX1262 +14 dBm row, the same one V2.5 calls configureOptimized14dBm. Not RadioLib's
+// 0x04 / 0x07, which is the +22 dBm row whatever power is asked for
 constexpr const char *kRadioModuleName = "hp";
-constexpr int8_t   kRadioPowerDbm = 20;
+constexpr int8_t   kRadioPowerDbm = 14;   // same as kPaPowerDbm, so the two writes can't disagree
 constexpr bool     kImuSleepsDuringTx = true;
-constexpr int8_t   kPaPowerDbm = 22;
+constexpr int8_t   kPaPowerDbm = 14;
 constexpr uint8_t  kPaDutyCycle = 0x02;
 constexpr uint8_t  kPaDeviceSel = 0x00;   // high power PA
-constexpr uint8_t  kPaHpMax = 0x03;
+constexpr uint8_t  kPaHpMax = 0x02;
 constexpr uint8_t  kPaLut = 0x01;
 #else
 #error "CHIPSAT_RADIO_MODULE has to be CHIPSAT_RADIO_MODULE_LE or CHIPSAT_RADIO_MODULE_HP"
 #endif
+
+// W25Q16JV flash on SPI2. Page numbers are the printed ones in Winbond's datasheet Rev I
+constexpr uint32_t kFlashMosiPin = PA10;
+constexpr uint32_t kFlashMisoPin = PB14;
+constexpr uint32_t kFlashSckPin = PB13;
+constexpr uint32_t kFlashCsPin = PB9;   // plain gpio, R18 pulls it high while the MCU is in reset
+
+constexpr uint8_t kFlashCmdWriteEnable = 0x06;
+constexpr uint8_t kFlashCmdReadStatus1 = 0x05;
+constexpr uint8_t kFlashCmdRead = 0x03;
+constexpr uint8_t kFlashCmdPageProgram = 0x02;
+constexpr uint8_t kFlashCmdSectorErase = 0x20;
+constexpr uint8_t kFlashCmdChipErase = 0xC7;
+constexpr uint8_t kFlashCmdJedecId = 0x9F;
+constexpr uint8_t kFlashCmdPowerDown = 0xB9;
+constexpr uint8_t kFlashCmdReleasePowerDown = 0xAB;
+constexpr uint8_t kFlashStatusBusy = 0x01;
+constexpr uint8_t kFlashStatusWel = 0x02;
+
+// EF 40 15 is the IQ part on the schematic. The IM part (EF 70 15) has a working /HOLD, and /HOLD
+// floats on our board (p.19, p.72)
+constexpr uint8_t kFlashManufacturerId = 0xEF;
+constexpr uint8_t kFlashMemoryType = 0x40;
+constexpr uint8_t kFlashCapacity = 0x15;
+
+constexpr uint32_t kFlashSize = 2097152;
+constexpr uint32_t kFlashPageSize = 256;
+constexpr uint32_t kFlashSectorSize = 4096;
+
+// Datasheet max is 3 ms, 400 ms and 25 s (p.63). The bench measured 0.35 ms and 36 ms
+constexpr uint32_t kFlashProgramTimeoutMs = 10;
+constexpr uint32_t kFlashEraseTimeoutMs = 1000;
+constexpr uint32_t kFlashChipEraseTimeoutMs = 30000;
+constexpr uint32_t kFlashSpiTimeoutMs = 50;   // per HAL transfer, a 4 kB read is about 11 ms at 3 MHz
+constexpr uint32_t kFlashWakeMs = 2;   // tRES1 is 3 us, but waitMs(1) can return in a few us if the tick is about to change
 
 } // namespace ChipSatConstants

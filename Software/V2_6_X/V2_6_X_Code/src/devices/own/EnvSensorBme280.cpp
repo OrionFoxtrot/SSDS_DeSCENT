@@ -255,7 +255,8 @@ Status EnvSensor::startMeasurement()
 Status EnvSensor::read()
 {
   // An absent chip only costs one unanswered address here
-  if (!ready_ && system_.nowMs() - lastStartMs_ >= kEnvRetryMs && start()) {
+  const uint32_t now = system_.nowMs();
+  if (!ready_ && now - lastStartMs_ >= sensorRetryMs(now, kEnvRetryMs) && start()) {
     LOG_I(Env, "init") {
       line.field("ok", true);
       line.field("retry", true);

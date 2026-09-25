@@ -551,7 +551,7 @@ void Imu::restartStep()
 
   switch (restart) {
     case Restart::Idle: {
-      if (elapsed < kImuRetryMs) {
+      if (elapsed < sensorRetryMs(now, kImuRetryMs)) {
         return;
       }
       restartMs = now;

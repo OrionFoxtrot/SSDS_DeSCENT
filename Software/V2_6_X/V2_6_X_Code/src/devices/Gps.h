@@ -32,6 +32,16 @@ public:
   uint8_t fixType() const { return fixType_; }
   uint8_t satellites() const { return satellites_; }
   bool llhChecked() const { return llhChecked_; }
+
+  // UTC from the receiver, which it has before it has a position. utcValid() only goes true once the
+  // receiver calls its own time fully resolved. utcUptimeMs() is when the frame carrying it started
+  // arriving, so the two can be lined up
+  bool utcValid() const { return utcValid_; }
+  uint32_t utcEpoch() const { return utcEpoch_; }      // seconds since 1970
+  int32_t utcNano() const { return utcNano_; }         // the fraction of that second
+  uint32_t utcAccNs() const { return utcAccNs_; }      // the receiver's own error estimate
+  uint8_t utcBits() const { return utcBits_; }         // its validity bits, kept as they came
+  uint32_t utcUptimeMs() const { return utcUptimeMs_; }
   bool invalidLlh() const { return invalidLlh_; }
 
 private:
@@ -48,6 +58,7 @@ private:
   void clearStoredPosition();
   bool configureOutput();
   void takePvt();
+  void takeUtc();
 
   ChipSatPlatform::Uart &port_;
   ChipSatPlatform::System &system_;
@@ -62,6 +73,12 @@ private:
   uint32_t lastPvtMs_ = 0;
   uint32_t lastConfigMs_ = 0;
   bool inRange_ = true;
+  bool utcValid_ = false;
+  uint32_t utcEpoch_ = 0;
+  int32_t utcNano_ = 0;
+  uint32_t utcAccNs_ = 0;
+  uint8_t utcBits_ = 0;
+  uint32_t utcUptimeMs_ = 0;
   uint8_t fixType_ = 0;
   bool fixOk_ = false;
   uint8_t satellites_ = 0;

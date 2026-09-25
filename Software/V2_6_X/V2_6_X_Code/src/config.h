@@ -39,18 +39,18 @@
 #define CHIPSAT_RADIO_MODULE_LE 1
 #define CHIPSAT_RADIO_MODULE_HP 2
 #ifndef CHIPSAT_RADIO_MODULE
-#define CHIPSAT_RADIO_MODULE    CHIPSAT_RADIO_MODULE_HP
+#define CHIPSAT_RADIO_MODULE    CHIPSAT_RADIO_MODULE_LE
 #endif
 
 // Console log level: 0 off, 1 error, 2 warn, 3 info, 4 debug
 #ifndef CHIPSAT_LOG_LEVEL
-#define CHIPSAT_LOG_LEVEL 3
+#define CHIPSAT_LOG_LEVEL 4
 #endif
 
 namespace ChipSatConfig
 {
 
-constexpr uint8_t kChipSatId = 64;   // change for each board
+constexpr uint8_t kChipSatId = 13;   // change for each board
 
 constexpr uint32_t kConsoleBaud = 115200;
 
@@ -58,6 +58,32 @@ constexpr uint32_t kConsoleBaud = 115200;
 constexpr uint8_t kLedLevelAtBoot = LOW;
 constexpr uint8_t kLedLevelDuringTx = LOW;
 constexpr uint8_t kLedLevelAfterTx = HIGH;
+
+// How the loop runs. Sensors keep their own pace, a packet takes the newest reading each one has as
+// long as it is younger than its limit here, and anything older goes out with its validity bit clear
+constexpr uint32_t kImuMaxAgeMs = 500;      // reports arrive every 50 ms
+constexpr uint32_t kEnvMaxAgeMs = 2000;
+constexpr uint32_t kGaugeMaxAgeMs = 30000;
+
+// How often each sensor is asked, when nothing else is waiting on it
+constexpr uint32_t kEnvIntervalMs = 200;
+constexpr uint32_t kEnvConversionMs = 120;   // x16 takes 113, see kEnvOversampling
+constexpr uint32_t kGpsIntervalMs = 500;     // the receiver only has a new one each second
+constexpr uint32_t kGaugeIntervalMs = 1000;
+
+// How often the uptime is tied to GPS time in the log and on the console, once the receiver has it
+constexpr uint32_t kUtcAnchorIntervalMs = 10000;
+
+// Flash log. Every record is 64 bytes, so 20 Hz fills the 2 MB chip in about 27 minutes
+constexpr uint32_t kLogIntervalMs = 50;
+constexpr uint32_t kLogLandedIntervalMs = 1000;
+
+// Landing: all of these together for kLandingQuietMs drops the logging rate. Free fall looks like
+// sitting still to the IMU, so the pressure has to be steady too
+constexpr uint32_t kLandingQuietMs = 10000;
+constexpr uint32_t kLandingEarliestMs = 60000;   // never before this, so it can't trigger on the pad
+constexpr float    kLandingPressureHpa = 0.5f;
+constexpr float    kLandingAccelMps2 = 0.5f;
 
 // How often a packet goes out
 // Battery data is read and sent every packet either way
@@ -95,7 +121,6 @@ constexpr uint16_t kImuReplyWaitMs = 250;     // product id and each enable's re
 constexpr uint16_t kImuPollMs = 5;            // between reads while waiting for an answer
 
 // IMU health checks
-constexpr uint32_t kImuStaleMs = 1000;          // IMU data older than this is sent as invalid
 constexpr uint8_t  kImuStuckCycles = 3;         // cycles with a silent report before a soft reset
 constexpr uint8_t  kImuMaxSoftResets = 3;       // per boot
 constexpr uint8_t  kImuMaxServicePasses = 16;   // I2C reads per IMU update
@@ -139,10 +164,28 @@ constexpr uint32_t kGaugeRetryMs = 10000;   // how often read() tries again to s
 // Radio
 constexpr float    kRadioFrequencyMhz = 915.0f;
 constexpr float    kRadioBandwidthKhz = 125.0f;
-constexpr uint8_t  kRadioSpreadingFactor = 9;
+#if CHIPSAT_RADIO_MODULE == CHIPSAT_RADIO_MODULE_HP
+constexpr uint8_t  kRadioSpreadingFactor = 12;   // 3.19 s on air, for range
+#else
+constexpr uint8_t  kRadioSpreadingFactor = 9;    // 467 ms on air
+#endif
 constexpr uint8_t  kRadioCodingRate = 7;   // 4/7
 constexpr uint8_t  kRadioSyncWord = 0x12;
 constexpr uint16_t kRadioPreambleLength = 8;
 constexpr float    kRadioCurrentLimitMa = 140.0f;   // 0 to 140. applyPaConfig overwrites it, see Radio.h
+
+// Sensor retries
+// A sensor that fails its first try gets tried hard for the first half minute, then backs off to its
+// own interval. Measured on the bench 2026-09-24: on a healthy rail the IMU is up 2.5 s after boot,
+// but on a cell it took 19 s on one board and 66 s on another, all of it spent waiting between
+// 10 s retries. A four minute fall can't spend a fifth of itself on that. The slow interval is still
+// what a genuinely dead sensor gets, so the loop never sits on one
+constexpr uint32_t kSensorRetryFastMs = 250;
+constexpr uint32_t kSensorRetryFastForMs = 30000;
+
+constexpr uint32_t sensorRetryMs(uint32_t uptimeMs, uint32_t slowMs)
+{
+  return uptimeMs < kSensorRetryFastForMs ? kSensorRetryFastMs : slowMs;
+}
 
 } // namespace ChipSatConfig

@@ -23,6 +23,7 @@ static const char *tagName(Tag tag)
     case Tag::Tx: return "TX";
     case Tag::Cyc: return "CYC";
     case Tag::Pkt: return "PKT";
+    case Tag::Flash: return "FLASH";
   }
   return "?";
 }

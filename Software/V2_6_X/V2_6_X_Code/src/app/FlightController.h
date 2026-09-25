@@ -11,6 +11,9 @@
 #include "../platform/I2cBus.h"
 #include "../platform/System.h"
 #include "../platform/Uart.h"
+#include "../devices/Flash.h"
+#include "FlashLog.h"
+#include "Landing.h"
 #include "Telemetry.h"
 
 namespace ChipSatApp
@@ -29,7 +32,9 @@ public:
                    ChipSatDevices::EnvSensor &env,
                    ChipSatDevices::FuelGauge &gauge,
                    ChipSatDevices::Radio &radio,
-                   ChipSatDevices::Led &led);
+                   ChipSatDevices::Led &led,
+                   ChipSatDevices::Flash &flash,
+                   FlashLog &flashLog);
 
   void setup();
   void loop();
@@ -53,6 +58,11 @@ private:
   void sendStatusPacket();
   void keepAlive();
   bool configRadio();   // false if any step failed
+  void sampleSensors();     // each sensor at its own pace, nothing waits on the radio
+  void logIfDue();
+  void anchorUtc(uint32_t nowMs);
+  void buildPacket(ChipSatTelemetry::TelemetryPacket &into, bool &allFresh, uint16_t counter);
+  bool transmitDue() const;
   void runCycle();
   void transmit();
   void logReads(const CycleReads &reads) const;
@@ -67,10 +77,23 @@ private:
   ChipSatDevices::FuelGauge &gauge_;
   ChipSatDevices::Radio &radio_;
   ChipSatDevices::Led &led_;
+  ChipSatDevices::Flash &flash_;
+  FlashLog &flashLog_;
 
   ChipSatSensors::SensorData data_;
   ChipSatTelemetry::TelemetryPacket packet_{};
+  ChipSatTelemetry::TelemetryPacket logPacket_{};   // kept apart, the radio has the other one
+  Landing landing_;
+  uint32_t envStartedMs_ = 0;
+  bool envMeasuring_ = false;
+  uint32_t gpsReadMs_ = 0;
+  uint32_t gaugeReadMs_ = 0;
+  uint32_t logWrittenMs_ = 0;
+  uint32_t utcAnchorMs_ = 0;
+  bool utcAnchored_ = false;
+  bool logFull_ = false;
   uint16_t packetCounter_ = 0;
+  uint16_t sentCounter_ = 0;   // the counter on the last packet that actually went out
   uint32_t previousReadMs_ = 0;
   uint32_t txIntervalMs_;
   uint32_t cycle_ = 0;   // for logging

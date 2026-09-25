@@ -81,11 +81,23 @@ add_library(arduino_core STATIC
 target_include_directories(arduino_core PRIVATE ${COMMON_INCLUDES})
 
 # the flight software. The .ino is plain C++ once Arduino.h is included first, which is all arduino-cli adds
-file(GLOB_RECURSE SKETCH_SOURCES CONFIGURE_DEPENDS ${SKETCH}/src/*.cpp ${SKETCH}/src/*.c)
-set_source_files_properties(${SKETCH}/V2_6_X_Code.ino PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-x;c++;-include;Arduino.h")
+set(CHIPSAT_SKETCH "" CACHE FILEPATH "a bench sketch to build instead of the flight software")
+if(CHIPSAT_SKETCH)
+  # a bench sketch includes the few .cpp files it needs itself, so globbing src/ would define them twice
+  set(SKETCH_INO "${CHIPSAT_SKETCH}")
+  set(SKETCH_SOURCES "")
+  # only the bench sketches use SPI.h. Its global SPI object has a constructor, so linking it into the
+  # flight software costs 324 bytes of flash and 128 of RAM for something never called
+  set(SPI_SOURCES "${CORE}/libraries/SPI/src/SPI.cpp" "${CORE}/libraries/SPI/src/utility/spi_com.c")
+else()
+  set(SPI_SOURCES "")
+  set(SKETCH_INO "${SKETCH}/V2_6_X_Code.ino")
+  file(GLOB_RECURSE SKETCH_SOURCES CONFIGURE_DEPENDS ${SKETCH}/src/*.cpp ${SKETCH}/src/*.c)
+endif()
+set_source_files_properties("${SKETCH_INO}" PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-x;c++;-include;Arduino.h")
 
 add_executable(chipsat
-  ${SKETCH}/V2_6_X_Code.ino
+  "${SKETCH_INO}"
   ${SKETCH_SOURCES}
   "${CORE}/libraries/SrcWrapper/src/HAL/stm32yyxx_hal.c"
   "${CORE}/libraries/SrcWrapper/src/HAL/stm32yyxx_hal_comp.c"
@@ -269,11 +281,13 @@ add_executable(chipsat
   "${CORE}/libraries/SrcWrapper/src/stm32/uart.c"
   "${CORE}/libraries/Wire/src/utility/twi.c"
   "${CORE}/libraries/Wire/src/Wire.cpp"
-  "${CORE}/libraries/IWatchdog/src/IWatchdog.cpp")
+  "${CORE}/libraries/IWatchdog/src/IWatchdog.cpp"
+  ${SPI_SOURCES})
 target_include_directories(chipsat PRIVATE ${COMMON_INCLUDES}
   "${CORE}/libraries/SrcWrapper/src"
   "${CORE}/libraries/Wire/src"
-  "${CORE}/libraries/IWatchdog/src")
+  "${CORE}/libraries/IWatchdog/src"
+  "${CORE}/libraries/SPI/src")
 
 target_link_options(chipsat PRIVATE
   ${CHIP_FLAGS} -Os --specs=nano.specs

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <math.h>
 #include "FlightController.h"
 #include "ImuValidity.h"
 #include "TxInterval.h"
@@ -28,9 +29,12 @@ FlightController::FlightController(ChipSatPlatform::System &system,
                                    ChipSatDevices::EnvSensor &env,
                                    ChipSatDevices::FuelGauge &gauge,
                                    ChipSatDevices::Radio &radio,
-                                   ChipSatDevices::Led &led)
+                                   ChipSatDevices::Led &led,
+                                   ChipSatDevices::Flash &flash,
+                                   FlashLog &flashLog)
   : system_(system), i2c_(i2c), console_(console), gpsPort_(gpsPort), imu_(imu), gps_(gps), env_(env),
-    gauge_(gauge), radio_(radio), led_(led), txIntervalMs_(kTxIntervalMs)
+    gauge_(gauge), radio_(radio), led_(led), flash_(flash), flashLog_(flashLog),
+    txIntervalMs_(kTxIntervalMs)
 {
 }
 
@@ -80,6 +84,23 @@ void FlightController::beginSensors()
   i2c_.begin(kI2cSdaPin, kI2cSclPin);
   gpsPort_.begin(kGpsBaud);   // before the IMU
 
+  if (flash_.begin() == Status::Ok) {
+    flashLog_.begin();
+    // two erases at boot, so the first records aren't held: the end sector, then the next
+    for (uint8_t i = 0; i < 2; ++i) {
+      flashLog_.ensureSpace();
+      const uint32_t startMs = system_.nowMs();
+      while (flashLog_.busy() && system_.nowMs() - startMs < kFlashEraseTimeoutMs) {
+        system_.waitMs(1);
+      }
+    }
+    LOG_I(Flash, "log") {
+      line.field("records", flashLog_.records());
+      line.field("boot", flashLog_.bootCount());
+      line.field("full", flashLog_.full());
+    }
+  }
+
   imu_.begin(kImuReportIntervalMs);
   keepAlive();
   gps_.begin();
@@ -93,6 +114,7 @@ void FlightController::beginSensors()
 void FlightController::sendStatusPacket()
 {
   ChipSatTelemetry::encodePacket(data_, packetCounter_, kChipSatId, false, packet_);
+  sentCounter_ = packetCounter_;
   packetCounter_++;
   LOG_PACKET(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
   transmit();
@@ -165,10 +187,140 @@ void FlightController::loop()
   system_.feedWatchdog();
   imu_.service();
   gps_.service();
+  sampleSensors();
+  logIfDue();
 
-  if (system_.nowMs() - previousReadMs_ >= txIntervalMs_) {
+  if (transmitDue()) {
     runCycle();
   }
+}
+
+// Each sensor at its own pace. Nothing here waits for the radio, and nothing waits for a reading it
+// hasn't got yet
+void FlightController::sampleSensors()
+{
+  const uint32_t now = system_.nowMs();
+
+  if (!envMeasuring_) {
+    if (now - envStartedMs_ >= kEnvIntervalMs) {
+      envMeasuring_ = env_.startMeasurement() == Status::Ok;
+      envStartedMs_ = now;
+    }
+  } else if (now - envStartedMs_ >= kEnvConversionMs) {
+    env_.read();   // the conversion is over, so this doesn't wait
+    envMeasuring_ = false;
+  }
+
+  if (now - gpsReadMs_ >= kGpsIntervalMs) {
+    gps_.read();
+    gpsReadMs_ = now;
+  }
+
+  if (now - gaugeReadMs_ >= kGaugeIntervalMs) {
+    gauge_.read();
+    gaugeReadMs_ = now;
+  }
+}
+
+// The newest reading each sensor has, with anything too old marked invalid
+void FlightController::buildPacket(ChipSatTelemetry::TelemetryPacket &into, bool &allFresh,
+                                   uint16_t counter)
+{
+  const uint32_t now = system_.nowMs();
+
+  data_.imu = imu_.data();
+  data_.gps = gps_.data();
+  data_.stateOfCharge = gauge_.data();
+  data_.environmental = env_.data();
+
+  clearStaleImuReports(data_.imu, now, kImuMaxAgeMs);
+  if (now - data_.environmental.updatedMs > kEnvMaxAgeMs) {
+    data_.environmental.valid = false;
+  }
+  if (now - data_.stateOfCharge.updatedMs > kGaugeMaxAgeMs) {
+    data_.stateOfCharge.valid = false;
+  }
+  // the GPS driver already refuses anything older than kGpsPvtMaxAgeMs
+
+  allFresh = data_.imu.linearAccelerationValid && data_.imu.gyroscopeValid &&
+             data_.imu.magnetometerValid && data_.imu.orientationValid &&
+             data_.gps.valid && data_.stateOfCharge.valid && data_.environmental.valid;
+
+  ChipSatTelemetry::encodePacket(data_, counter, kChipSatId, allFresh, into);
+}
+
+// One record per log interval, slower once the sat is on the ground
+void FlightController::logIfDue()
+{
+  // A full chip is the end of the mission's logging, not a fault. Stop building records for it and
+  // leave the cycle to the radio, which is what matters once there's nowhere left to write
+  if (flashLog_.full()) {
+    if (!logFull_) {
+      logFull_ = true;
+      LOG_W(Flash, "full") {
+        line.field("records", flashLog_.records());
+        line.field("dropped", flashLog_.dropped());
+      }
+    }
+    return;
+  }
+
+  const uint32_t now = system_.nowMs();
+  const uint32_t interval = landing_.landed() ? kLogLandedIntervalMs : kLogIntervalMs;
+  if (now - logWrittenMs_ < interval) {
+    return;
+  }
+  logWrittenMs_ = now;
+
+  // the counter of the packet that last went out, not the one being built next: the counter only
+  // moves on a transmission, and a record carrying the next one can't be lined up against a radio log
+  bool allFresh = false;
+  buildPacket(logPacket_, allFresh, sentCounter_);
+
+  const ChipSatSensors::Vector3f &a = data_.imu.linearAccelerationMps2;
+  landing_.update(now, sqrtf(a.x * a.x + a.y * a.y + a.z * a.z),
+                  data_.environmental.pressurePa / 100.0f,
+                  data_.imu.linearAccelerationValid && data_.environmental.valid);
+
+  anchorUtc(now);
+
+  if (flashLog_.ready()) {
+    flashLog_.append(logPacket_, now);
+    if (!flash_.paused()) {
+      flashLog_.ensureSpace();
+    }
+  }
+}
+
+// Ties this boot's uptime to UTC, in the log and on the console. One line is enough to put a clock on
+// every record of the boot, the earlier ones included
+void FlightController::anchorUtc(uint32_t nowMs)
+{
+  if (!gps_.utcValid()) {
+    return;
+  }
+  if (utcAnchored_ && nowMs - utcAnchorMs_ < kUtcAnchorIntervalMs) {
+    return;
+  }
+  utcAnchorMs_ = nowMs;
+  utcAnchored_ = true;
+
+  if (flashLog_.ready()) {
+    flashLog_.appendTime(gps_.utcUptimeMs(), gps_.utcEpoch(), gps_.utcNano(), gps_.utcBits(),
+                         gps_.utcAccNs());
+  }
+  LOG_I(Gps, "utc") {
+    line.field("epoch", gps_.utcEpoch());
+    line.field("uptime", gps_.utcUptimeMs());
+    line.field("nano", gps_.utcNano());
+    line.fieldHex("bits", gps_.utcBits(), 2);
+    line.field("accns", gps_.utcAccNs());
+  }
+}
+
+bool FlightController::transmitDue() const
+{
+  return system_.nowMs() - previousReadMs_ >= txIntervalMs_;
 }
 
 void FlightController::runCycle()
@@ -176,44 +328,28 @@ void FlightController::runCycle()
   ++cycle_;
   ChipSatLog::setCycle(cycle_);
 
+  const uint32_t now = system_.nowMs();
   CycleReads reads;
-  reads.gateMs = system_.nowMs();
-  env_.startMeasurement();   // converts while the other reads run
-  const Status imuRead = imu_.waitForFresh(kImuFreshWaitCycleMs);
-  reads.imuOkay = imuRead == Status::Ok;
-  const uint32_t imuDoneMs = system_.nowMs();
-  reads.gpsOkay = gps_.read() == Status::Ok;
-  const uint32_t gpsDoneMs = system_.nowMs();
-  reads.socOkay = gauge_.read() == Status::Ok;
-  const uint32_t socDoneMs = system_.nowMs();
-  reads.envOkay = env_.read() == Status::Ok;
-  const uint32_t envDoneMs = system_.nowMs();
+  reads.gateMs = now;
 
-  reads.imuMs = imuDoneMs - reads.gateMs;
-  reads.gpsMs = gpsDoneMs - imuDoneMs;
-  reads.socMs = socDoneMs - gpsDoneMs;
-  reads.envMs = envDoneMs - socDoneMs;
+  bool allDataFresh = false;
+  buildPacket(packet_, allDataFresh, packetCounter_);
 
-  data_.imu = imu_.data();
-  data_.gps = gps_.data();
-  data_.stateOfCharge = gauge_.data();
-  data_.environmental = env_.data();
-
-  // A GPS frame taken in during the env wait can clear valid after read() said Ok
-  reads.gpsOkay = reads.gpsOkay && data_.gps.valid;
-  const bool allDataFresh = reads.imuOkay && reads.gpsOkay && reads.socOkay && reads.envOkay;
-
-  // Don't send frozen IMU values as valid. Only the packet copy changes
-  const uint8_t staleReports = clearStaleImuReports(data_.imu, system_.nowMs(), kImuStaleMs);
-  if (staleReports != 0) {
-    LOG_W(Imu, "stale") { line.fieldBits("cleared", staleReports, 4); }
-  }
+  // how old each reading in this packet is
+  reads.imuOkay = data_.imu.linearAccelerationValid;
+  reads.gpsOkay = data_.gps.valid;
+  reads.socOkay = data_.stateOfCharge.valid;
+  reads.envOkay = data_.environmental.valid;
+  reads.imuMs = now - data_.imu.linearAccelerationUpdatedMs;
+  reads.gpsMs = now - data_.gps.updatedMs;
+  reads.socMs = now - data_.stateOfCharge.updatedMs;
+  reads.envMs = now - data_.environmental.updatedMs;
 
   logReads(reads);
   system_.waitMs(0);   // the console blocks while its buffer drains, read the GPS port
 
   const uint16_t counterUsed = packetCounter_;
-  ChipSatTelemetry::encodePacket(data_, packetCounter_, kChipSatId, allDataFresh, packet_);
+  sentCounter_ = counterUsed;
   packetCounter_++;
 
   LOG_PACKET(reinterpret_cast<const uint8_t *>(&packet_), sizeof(packet_));
@@ -225,6 +361,9 @@ void FlightController::runCycle()
     line.field("gate", reads.gateMs);
     line.field("imuready", imu_.ready());
     line.field("imusleep", imu_.sleeping());
+    line.field("landed", landing_.landed());
+    line.field("rec", flashLog_.records());
+    line.field("drop", flashLog_.dropped());
   }
 
   // HP module only, the IMU sleeps for the transmission. The packet goes out either way
@@ -232,7 +371,15 @@ void FlightController::runCycle()
   if (imuSleeps) {
     imu_.sleep();
   }
+  // same rule for the flash: on the HP module nothing is logged during a transmission anyway
+  const bool flashSleeps = kImuSleepsDuringTx && flash_.ready() && !flashLog_.busy();
+  if (flashSleeps) {
+    flash_.pause();
+  }
   transmit();
+  if (flashSleeps) {
+    flash_.resume();
+  }
   if (imuSleeps) {
     imu_.wake();
   }
@@ -301,6 +448,9 @@ void FlightController::transmit()
     const uint32_t timeoutMs = radio_.timeOnAirMs(sizeof(packet_)) + 100;
     while (!radio_.transmitDone() && system_.nowMs() - startMs <= timeoutMs) {
       system_.waitMs(1);
+      imu_.service();   // asleep on the HP module, where service() returns at once
+      sampleSensors();
+      logIfDue();
     }
     const bool done = radio_.transmitDone();
     status = radio_.finishTransmit();
@@ -332,7 +482,7 @@ void FlightController::logReads(const CycleReads &reads) const
 {
   LOG_I(Imu, "read") {
     line.field("ok", reads.imuOkay);
-    line.field("ms", reads.imuMs);
+    line.field("age", reads.imuMs);
     line.fieldBits("valid", imuValidBits(data_.imu), 4);
     const uint32_t age[4] = {
       line.ms() - data_.imu.linearAccelerationUpdatedMs,
@@ -349,17 +499,17 @@ void FlightController::logReads(const CycleReads &reads) const
       line.field("llhbad", gps_.invalidLlh());
     }
     line.field("valid", data_.gps.valid);
-    line.field("ms", reads.gpsMs);
+    line.field("age", reads.gpsMs);
   }
   LOG_I(Soc, "read") {
     line.field("ok", reads.socOkay);
     line.field("valid", data_.stateOfCharge.valid);
-    line.field("ms", reads.socMs);
+    line.field("age", reads.socMs);
   }
   LOG_I(Env, "read") {
     line.field("ok", reads.envOkay);
     line.field("valid", data_.environmental.valid);
-    line.field("ms", reads.envMs);
+    line.field("age", reads.envMs);
   }
 
   LOG_D(Imu, "values") {
