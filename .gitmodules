@@ -1,0 +1,3 @@
+[submodule "Software/V2_6_X"]
+	path = Software/V2_6_X
+	url = https://github.com/ThePrivatePanda/DeSCENT
