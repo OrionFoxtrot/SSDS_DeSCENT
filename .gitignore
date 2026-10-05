@@ -44,3 +44,7 @@
 oldV2_5_X_Code/
 V2_5_X_Code_GPS_Blocking_Airborne_Sleep_TX/
 powerTesting/
+
+# Claude Code working files: council transcripts, agent output, session state
+.claude/
+**/.claude/
